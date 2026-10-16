@@ -1,97 +1,95 @@
-r"""通知解析模块 —— 队长负责。
-
-main.py 依赖这里的：
-
-    clean_notification_text(raw_text: str) -> dict
-
-返回的字段必须和前端 index.html 对齐（前端会读这几个）：
-    app_name   发送方名称，显示在卡片上
-    title      标题
-    category   只有三种：重要/紧急待办、物流与消费、无效广告/促销
-    is_urgent  布尔值，前端用它决定"标红置顶"
-    summary    摘要
-
-依赖：pip install openai（DeepSeek 用 OpenAI 兼容接口）
-
-API Key 从环境变量读：
-    $env:DEEPSEEK_API_KEY = "sk-xxxxxxxx"
-"""
-
-from __future__ import annotations
-
-import logging
 import os
-
 from openai import OpenAI
 
-logger = logging.getLogger("quipus.cleaner")
-
-# ---------------------------------------------------------------------------
-# 客户端
-# ---------------------------------------------------------------------------
-# openai 3.x 在 api_key 为空时会直接抛 OpenAIError，导致模块导入失败、服务起不来。
-# 所以密钥缺失时塞一个占位值，让服务照常启动，真正调用接口时才返回 502。
-_api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
-if not _api_key:
-    logger.warning("未设置 DEEPSEEK_API_KEY：服务能启动，但调用接口会返回 502")
-    _api_key = "placeholder-please-set-DEEPSEEK_API_KEY"
-
-client = OpenAI(
-    api_key=_api_key,
-    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-)
-
-# ---------------------------------------------------------------------------
-# 提示词
-# ---------------------------------------------------------------------------
-# 注意 1：用了 response_format={"type": "json_object"}，提示词里必须出现 "json" 字样
-# 注意 2：category 的取值必须和前端约定的三种完全一致，否则前端渲染错位
-# 注意 3：字段名也必须和前端一致（app_name / is_urgent 不能少）
-system_prompt = """你是一个手机通知整理助手。把用户发来的原始通知整理成 json，字段固定为：
-{
-  "app_name": "发送方名称，去掉【】，例如 淘宝、菜鸟驿站、招商银行、中国移动、教务处",
-  "title": "一句话概括这条通知说了什么，去掉情绪化修饰",
-  "category": "只能填这三个之一：重要/紧急待办、物流与消费、无效广告/促销",
-  "is_urgent": "布尔值 true 或 false，表示是否需要用户尽快处理",
-  "summary": "50 字以内的要点摘要",
-  "deadline": "截止时间或最后期限，没有就填 null",
-  "location": "地点，没有就填 null",
-  "contact": "联系人或联系电话，没有就填 null"
-}
-
-category 的判断标准：
-- 重要/紧急待办：学校教务通知、账单还款、图书到期、停水停电、考试作业等需要用户行动或关注的
-- 物流与消费：快递发货、驿站取件、外卖配送、支付扣款等交易和物流类
-- 无效广告/促销：营销推广、优惠券、招生广告等用户不需要的垃圾信息
-
-is_urgent 为 true 的情形：有明确截止时间、会停机/欠费/逾期、临近过期、要求尽快处理。
-其余情况填 false。
-
-注意：contact 只填具体的联系人或电话；发送方机构名称要填在 app_name 里，不要填进 contact。
-
-只返回 json，不要任何解释文字。"""
-
-
-# ---------------------------------------------------------------------------
-# 解析函数
-# ---------------------------------------------------------------------------
-def clean_notification_text(raw_text: str):
-    """接收一条原始通知文本，返回解析后的字典数据。"""
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": raw_text},
-        ],
-        response_format={"type": "json_object"},
-        stream=False,
+def clean_notification_text(raw_notification: str) -> dict:
+    """
+    接收原始通知文本，调用 DeepSeek 大模型进行去噪与结构化提取
+    返回标准的 Python 字典（Dict）
+    """
+    client = OpenAI(
+        api_key="sk-d3effab33794447eabbe6849e9a6af7a", 
+        base_url="https://api.deepseek.com"
     )
-    # 直接将 JSON 字符串解析成 Python 字典返回
-    import json
 
-    return json.loads(response.choices[0].message.content)
+    system_prompt = """
+    你是一个智能信息去噪与聚合系统的核心大脑。请对输入的手机原始通知文本进行语义理解、意图分类与信息提取。
+    请严格遵守以下分类与紧急度（is_urgent）判定规则：
+    1. 【无效广告/促销】：商城促销、优惠券、理财、课程招生等。
+    2. 【物流与消费】：快递派送、订单交易、外卖配送、普通账户充值/消费提醒。
+    3. 【重要/紧急待办】：仅限学校教务通知（停水、考试等）、请假审批、账号安全警告、以及【话费余额低于或等于5元、已欠费停机等会导致断网失联的严重临界提醒】。
+    
+    特别注意判定字段 "is_urgent"（布尔值）：
+    - 如果话费余额提示金额 > 5元（如 10元、20元、30元），"is_urgent" 必须为 false（属于普通提醒）。
+    - 如果话费余额提示金额 <= 5元 或提示已欠费停机，"is_urgent" 必须为 true，且 category 应归为“重要/紧急待办”，以便触发强提醒和置顶！
 
+    必须严格输出以下标准的 JSON 格式，不要包含任何多余的解释性文字或 Markdown 标记外的内容：
+    {
+      "app_name": "应用名称",
+      "category": "分类（严格从三者中选择：无效广告/促销、物流与消费、重要/紧急待办）",
+      "title": "核心标题",
+      "summary": "一句话精简摘要",
+      "is_urgent": false
+    }
+    """
 
-# 旧名字也保留，谁 import 都不会报错
-process_notification = clean_notification_text
-clean_text = clean_notification_text
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": raw_notification}
+            ],
+            response_format={ "type": "json_object" },
+            stream=False
+        )
+        
+        # 将大模型返回的 JSON 字符串转成 Python 字典
+        import json
+        result_str = response.choices[0].message.content
+        return json.loads(result_str)
+
+    except Exception as e:
+        # 如果出错，返回一个降级的默认字典，防止后端崩溃
+        return {
+            "app_name": "系统提示",
+            "category": "无效广告/促销",
+            "title": "解析失败",
+            "summary": f"大模型调用出错: {str(e)}",
+            "is_urgent": False
+        }
+
+def aggregate_notifications(notification_list: list) -> dict:
+    """
+    接收多条同一事件的原始通知文本列表，让大模型进行去重与融合，生成一条精简的综合摘要卡片
+    """
+    client = OpenAI(
+        api_key="sk-d3effab33794447eabbe6849e9a6af7a", 
+        base_url="https://api.deepseek.com"
+    )
+
+    prompt = f"""
+    以下是用户针对同一件商品或事件收到的多条碎片化通知：
+    {notification_list}
+    
+    请帮用户进行“去重并融合”，生成一条精简的综合摘要卡片。必须严格输出以下 JSON 格式：
+    {{
+      "event_title": "事件主标题（例如：您的羽绒服已到达菜鸟驿站）",
+      "merged_summary": "融合后的综合摘要，包含核心提取信息（如取件码、快递单号等）",
+      "source_apps": ["淘宝网", "菜鸟驿站"]
+    }}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "你是一个信息去噪与聚合专家。"},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={ "type": "json_object" },
+            stream=False
+        )
+        import json
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        return {"event_title": "聚合失败", "merged_summary": str(e), "source_apps": []}
