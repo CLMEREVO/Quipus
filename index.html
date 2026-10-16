@@ -25,20 +25,36 @@
                     </div>
                 </div>
                 <nav class="p-4 space-y-1">
-                    <a href="#" @click="currentTab = 'overview'" :class="{'bg-indigo-600 text-white': currentTab === 'overview'}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-slate-800 transition">
-                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                        <span>通知概览</span>
-                    </a>
-                    <a href="#" @click="currentTab = 'blocked'" :class="{'bg-indigo-600 text-white': currentTab === 'blocked'}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-slate-800 transition">
-                        <i data-lucide="shield-alert" class="w-5 h-5"></i>
-                        <span>已拦截广告</span>
-                        <span class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ blockedCount }}</span>
-                    </a>
-                    <a href="#" @click="currentTab = 'express'" :class="{'bg-indigo-600 text-white': currentTab === 'express'}" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-slate-800 transition">
-                        <i data-lucide="package" class="w-5 h-5"></i>
-                        <span>聚合快递与消费</span>
-                    </a>
-                </nav>
+                   <div class="space-y-1">
+  <div 
+    @click="currentTab = 'overview'" 
+    :class="currentTab === 'overview' ? 'bg-indigo-600 text-white' : ''"
+    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+    :class="{'hover:bg-slate-800': currentTab !== 'overview'}"
+  >
+    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+    <span>通知概览</span>
+  </div>
+  <div 
+    @click="currentTab = 'blocked'" 
+    :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : ''"
+    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+    :class="{'hover:bg-slate-800': currentTab !== 'blocked'}"
+  >
+    <i data-lucide="shield-alert" class="w-5 h-5"></i>
+    <span>已拦截广告</span>
+    <span class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ blockedCount }}</span>
+  </div>
+  <div 
+    @click="currentTab = 'express'" 
+    :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : ''"
+    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+    :class="{'hover:bg-slate-800': currentTab !== 'express'}"
+  >
+    <i data-lucide="package" class="w-5 h-5"></i>
+    <span>聚合快递与消费</span>
+  </div>
+</div>     </nav>
             </div>
             <div class="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
                 全国人工智能创新应用大赛 · 其他赛道
@@ -61,8 +77,7 @@
             <div class="p-8 space-y-8 max-w-7xl mx-auto w-full">
                 
                 <!-- 统计卡片行 -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+<div v-show="currentTab === 'overview'" class="grid grid-cols-1 md:grid-cols-3 gap-6">                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p class="text-sm text-slate-500 font-medium">今日已处理通知</p>
                             <h3 class="text-2xl font-bold text-slate-900 mt-1">{{ historyList.length }}</h3>
@@ -86,7 +101,7 @@
                 </div>
 
                 <!-- 核心输入与测试区 -->
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-bold text-slate-800 flex items-center gap-2">
                             <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
@@ -118,7 +133,7 @@
                         <i data-lucide="Layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
 
-                    <div v-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
+                    <div v-if="filteredList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
                         暂无通知记录，请在上方的输入框中粘贴通知并点击“智能清洗”！
                     </div>
 
