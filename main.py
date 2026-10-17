@@ -1,8 +1,15 @@
 r"""Quipus 后端 —— 通知解析 + 历史存储 + 按分类筛选
 
+注意分工：
+    test_ai.py   队长的文件，提供 clean_notification_text / aggregate_notifications，
+                 我这边【不改动它】，只负责调用。
+    main.py      我负责，对外提供 HTTP 接口。
+    storage.py   我负责，SQLite 存储层。
+
 接口一览：
     GET    /                      健康检查
     POST   /api/clean             解析一条通知，并自动存进历史
+    POST   /api/aggregate         把多条碎片通知聚合成一条摘要（调用队长的聚合函数）
     GET    /api/history           按左侧标签拉历史（tab=overview/blocked/express/urgent）
     GET    /api/stats             顶部计数：总数 / 已拦截广告 / 物流 / 待办 / 紧急
     DELETE /api/history           清空历史
@@ -16,7 +23,6 @@ r"""Quipus 后端 —— 通知解析 + 历史存储 + 按分类筛选
 
 from __future__ import annotations
 
-import importlib
 import logging
 from typing import Any
 
@@ -33,32 +39,11 @@ from storage import (
     stats,
 )
 
+# 队长的解析与聚合函数（test_ai.py 由队长维护，这里只 import，不改它）
+from test_ai import aggregate_notifications, clean_notification_text
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("quipus")
-
-
-# ---------------------------------------------------------------------------
-# 导入队长写的清洗函数
-#   队长可能会把文件改名（test_ai / test_ai_2 ...），这里自动找一个能用的，
-#   省得他每次改名你都要跟着改代码。
-# ---------------------------------------------------------------------------
-def _load_cleaner():
-    for mod_name in ("test_ai", "test_ai_2", "cleaner"):
-        try:
-            mod = importlib.import_module(mod_name)
-        except ImportError:
-            continue
-        for fn_name in ("clean_notification_text", "process_notification", "clean_text"):
-            if hasattr(mod, fn_name):
-                logger.info("使用 %s.%s() 作为清洗函数", mod_name, fn_name)
-                return getattr(mod, fn_name)
-    raise ImportError(
-        "找不到清洗函数。请确认 test_ai.py（或 test_ai_2.py / cleaner.py）在本目录下，"
-        "且里面有 clean_notification_text 函数。"
-    )
-
-
-clean_notification_text = _load_cleaner()
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +71,14 @@ class NotificationRequest(BaseModel):
     text: str = Field(..., min_length=1, description="前端发来的通知原文")
 
 
+class AggregateRequest(BaseModel):
+    notifications: list[str] = Field(
+        ...,
+        min_length=1,
+        description="同一事件的多条碎片通知原文，例如 [淘宝发货, 菜鸟到站]",
+    )
+
+
 # ---------------------------------------------------------------------------
 # 接口
 # ---------------------------------------------------------------------------
@@ -94,34 +87,59 @@ def read_root():
     return {"message": "Quipus Backend is running successfully!"}
 
 
-@app.post("/api/clean", summary="解析通知并存入历史")
-def clean_notification(data: NotificationRequest) -> dict[str, Any]:
+@app.post("/api/clean", summary="解析一条通知，并存入历史")
+def clean_one(data: NotificationRequest) -> dict[str, Any]:
     raw_text = data.text
     logger.info("收到通知，长度=%d", len(raw_text))
 
-    # 调用大模型函数进行清洗
+    # 队长的函数内部已经 try/except 过，出错会返回降级字典而不是抛异常；
+    # 这里再兜一层，防止意料之外的错误把 500 抛给前端。
     try:
-        processed_data = clean_notification_text(raw_text)
+        processed_result = clean_notification_text(raw_text)
     except Exception as exc:
-        logger.exception("调用大模型失败")
+        logger.exception("调用 clean_notification_text 失败")
         raise HTTPException(
             status_code=502,
             detail=f"大模型解析失败: {type(exc).__name__}: {exc}",
         ) from exc
 
-    if not isinstance(processed_data, dict):
+    if not isinstance(processed_result, dict):
         raise HTTPException(
-            status_code=502, detail=f"大模型返回的不是 JSON 对象: {processed_data!r}"
+            status_code=502, detail=f"清洗函数返回的不是字典: {processed_result!r}"
         )
 
-    # 存进历史库，方便前端后面按分类拉
-    record = save_notification(raw_text, processed_data)
+    # 存进历史库，方便前端按分类拉取
+    record = save_notification(raw_text, processed_result)
 
     return {
         "status": "success",
         "raw_text": raw_text,
-        "processed_result": processed_data,
+        "processed_result": processed_result,
         "id": record["id"],            # 新增：这条记录的编号
+    }
+
+
+@app.post("/api/aggregate", summary="多条碎片通知聚合成一条摘要")
+def aggregate(data: AggregateRequest) -> dict[str, Any]:
+    logger.info("收到聚合请求，共 %d 条", len(data.notifications))
+
+    try:
+        merged = aggregate_notifications(data.notifications)
+    except Exception as exc:
+        logger.exception("调用 aggregate_notifications 失败")
+        raise HTTPException(
+            status_code=502,
+            detail=f"聚合失败: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    if not isinstance(merged, dict):
+        raise HTTPException(status_code=502, detail=f"聚合函数返回的不是字典: {merged!r}")
+
+    return {
+        "status": "success",
+        "source_count": len(data.notifications),
+        "raw_texts": data.notifications,
+        "aggregated_result": merged,   # { event_title, merged_summary, source_apps }
     }
 
 
