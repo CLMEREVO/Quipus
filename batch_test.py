@@ -1,4 +1,4 @@
-r"""批量测试队长的清洗函数 —— 看每条通知是不是都能"完美识别"。
+r"""批量测试队长的 clean_notification_text —— 看每条通知是不是都能"完美识别"。
 
 用法：
     cd C:\Quipus-Backend
@@ -9,10 +9,8 @@ r"""批量测试队长的清洗函数 —— 看每条通知是不是都能"完�
     期望分类 | 通知原文        ← 推荐，能顺便检查分类对不对
     通知原文                   ← 也行，只是没有分类核对
 
-输出：
-    - 表 A：分类核对（期望 vs 实际）
-    - 表 B：字段提取情况
-    - 完整结果存到 batch_result.json
+队长函数的固定输出（这 5 个字段）：
+    app_name / category / title / summary / is_urgent
 """
 
 from __future__ import annotations
@@ -23,41 +21,16 @@ import time
 import unicodedata
 from pathlib import Path
 
-import importlib
+# 队长的文件，只调用不改。他可能叫 test_ai.py 也可能叫 test_ai_3.py
+try:
+    from test_ai import clean_notification_text
+except ImportError:
+    from test_ai_3 import clean_notification_text
 
-# ---------------------------------------------------------------------------
-# 1. 找队长的清洗函数
-#    模块名可能是 test_ai（团队约定的名字）也可能是 cleaner，函数名也可能不一样，
-#    这里全部自动试一遍，找到就用，不用你手动改。
-# ---------------------------------------------------------------------------
-clean_fn = None
-_used = ""
+# 这 5 个字段前端 index.html 会真正用到，缺一个都算不合格
+REQUIRED_KEYS = ["app_name", "category", "title", "summary", "is_urgent"]
 
-for _mod_name in ("test_ai", "cleaner"):
-    try:
-        _mod = importlib.import_module(_mod_name)
-    except ImportError:
-        continue
-    for _fn_name in ("clean_notification_text", "process_notification", "clean_text"):
-        if hasattr(_mod, _fn_name):
-            clean_fn = getattr(_mod, _fn_name)
-            _used = f"{_mod_name}.{_fn_name}"
-            break
-    if clean_fn:
-        break
-
-if clean_fn is None:
-    sys.exit(
-        "× 找不到清洗函数。请确认 test_ai.py（或 cleaner.py）就在本文件夹里，"
-        "且里面有 clean_notification_text 这个函数。"
-    )
-
-# 这 5 个字段每条都必须有值（= 前端 index.html 真正会读的字段）
-REQUIRED_KEYS = ["app_name", "title", "category", "is_urgent", "summary"]
-# 这 3 个可以为 null（通知里本来就可能没写）
-OPTIONAL_KEYS = ["deadline", "location", "contact"]
-
-# 前端约定的三种分类，出现别的就说明提示词没约束住
+# 前端约定的三种分类
 VALID_CATEGORIES = ["重要/紧急待办", "物流与消费", "无效广告/促销"]
 
 FALLBACK = [
@@ -67,7 +40,7 @@ FALLBACK = [
 ]
 
 # ---------------------------------------------------------------------------
-# 2. 读测试数据
+# 读测试数据
 # ---------------------------------------------------------------------------
 DATA_FILE = Path(__file__).with_name("test_data.txt")
 items: list[tuple[str | None, str]] = []
@@ -94,12 +67,12 @@ if len(sys.argv) > 1:
     except ValueError:
         pass
 
-print(f"[函数] 使用 {_used}()")
-print("=" * 96)
+print("[函数] 使用 test_ai.clean_notification_text()")
+print("=" * 100)
 
 
 # ---------------------------------------------------------------------------
-# 3. 对齐工具（中文算 2 格，否则表格会歪）
+# 对齐工具（中文算 2 格，否则表格会歪）
 # ---------------------------------------------------------------------------
 def _w(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in str(s))
@@ -140,7 +113,7 @@ def cat_match(expected: str | None, actual: object) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 4. 逐条跑
+# 逐条跑
 # ---------------------------------------------------------------------------
 results: list[dict] = []
 
@@ -148,25 +121,23 @@ for i, (expected, text) in enumerate(items, start=1):
     print(f"[{i}/{len(items)}] {text[:44]}{'…' if len(text) > 44 else ''}")
     t0 = time.time()
     try:
-        data = clean_fn(text)
+        data = clean_notification_text(text)
         err = None
     except Exception as exc:
         data, err = None, f"{type(exc).__name__}: {exc}"
     cost = time.time() - t0
 
     if err:
-        status, miss_req, miss_opt = "❌ 报错", list(REQUIRED_KEYS), []
+        status, missing = "❌ 报错", list(REQUIRED_KEYS)
     elif not isinstance(data, dict):
-        status, miss_req, miss_opt = "❌ 非字典", list(REQUIRED_KEYS), []
+        status, missing = "❌ 非字典", list(REQUIRED_KEYS)
     else:
-        miss_req = [k for k in REQUIRED_KEYS if data.get(k) in (None, "", [], {})]
-        miss_opt = [k for k in OPTIONAL_KEYS if data.get(k) in (None, "", [], {})]
-        # ○ 不是错误：通知里本来就可能没有截止时间/地点/联系人
-        status = "❌ 缺必填" if miss_req else ("✅ 全字段都有" if not miss_opt else "○ 可选为空")
+        missing = [k for k in REQUIRED_KEYS if data.get(k) in (None, "", [], {})]
+        status = "❌ 缺字段" if missing else "✅ 五字段齐全"
 
     match = cat_match(expected, (data or {}).get("category") if isinstance(data, dict) else None)
     actual_cat = val(data, "category")
-    cat_illegal = isinstance(data, dict) and data.get("category") not in VALID_CATEGORIES
+    illegal = isinstance(data, dict) and data.get("category") not in VALID_CATEGORIES
 
     results.append(
         {
@@ -179,65 +150,59 @@ for i, (expected, text) in enumerate(items, start=1):
             "状态": status,
             "解析结果": data,
             "错误": err,
-            "必填字段缺失": miss_req,
-            "可选字段为空": miss_opt,
+            "缺失字段": missing,
         }
     )
 
-    flag = "" if not cat_illegal else "   ← 分类不在约定的三种里！"
-    print(f"         -> {status} ｜ 分类 {match}（期望 {expected or '—'} / 实际 {actual_cat}）｜ {cost:.1f} 秒{flag}")
+    flag = "" if not illegal else "   ← 分类不在约定的三种里！"
+    print(
+        f"         -> {status} ｜ 分类 {match}（期望 {expected or '—'} / 实际 {actual_cat}）"
+        f" ｜ is_urgent={val(data, 'is_urgent')} ｜ {cost:.1f} 秒{flag}"
+    )
     time.sleep(0.4)
 
 # ---------------------------------------------------------------------------
-# 5. 表 A：分类核对
+# 汇总表
 # ---------------------------------------------------------------------------
-print("=" * 96)
-print("【表 A】分类核对")
-print(pad("#", 4) + pad("期望分类", 16) + pad("实际分类", 18) + pad("匹配", 8) + pad("is_urgent", 12) + "app_name / title")
-print("-" * 96)
+print("=" * 100)
+print("【分类核对 + 关键字段】")
+print(
+    pad("#", 4) + pad("状态", 16) + pad("期望分类", 16) + pad("实际分类", 18)
+    + pad("匹配", 8) + pad("is_urgent", 11) + pad("app_name", 12) + "title"
+)
+print("-" * 100)
 for r in results:
     d = r["解析结果"]
     print(
-        pad(r["序号"], 4) + pad(r["期望分类"] or "—", 16) + pad(r["实际分类"], 18)
-        + pad(r["分类匹配"], 8) + pad(val(d, "is_urgent"), 12)
-        + pad(val(d, "app_name"), 12) + pad(val(d, "title"), 26)
+        pad(r["序号"], 4) + pad(r["状态"], 16) + pad(r["期望分类"] or "—", 16)
+        + pad(r["实际分类"], 18) + pad(r["分类匹配"], 8) + pad(val(d, "is_urgent"), 11)
+        + pad(val(d, "app_name"), 12) + pad(val(d, "title"), 30)
     )
+print("-" * 100)
 
-# ---------------------------------------------------------------------------
-# 6. 表 B：字段提取
-# ---------------------------------------------------------------------------
-print()
-print("【表 B】字段提取情况（- 表示该字段为 null）")
-print(pad("#", 4) + pad("状态", 16) + pad("deadline", 14) + pad("location", 14) + pad("contact", 18) + "summary")
-print("-" * 96)
-for r in results:
-    d = r["解析结果"]
-    print(
-        pad(r["序号"], 4) + pad(r["状态"], 16) + pad(val(d, "deadline"), 14)
-        + pad(val(d, "location"), 14) + pad(val(d, "contact"), 18) + pad(val(d, "summary"), 34)
-    )
-print("-" * 96)
-
-# ---------------------------------------------------------------------------
-# 7. 统计
-# ---------------------------------------------------------------------------
 ok = sum(1 for r in results if r["状态"].startswith("✅"))
-opt = sum(1 for r in results if r["状态"].startswith("○"))
 bad = sum(1 for r in results if r["状态"].startswith("❌"))
+print(f"字段完整度：共 {len(results)} 条 ｜ ✅ 五个字段齐全 {ok} 条 ｜ ❌ 有问题 {bad} 条")
 
 has_exp = [r for r in results if r["期望分类"]]
-cat_ok = sum(1 for r in has_exp if r["分类匹配"] == "✅")
-cat_fuzzy = sum(1 for r in has_exp if r["分类匹配"] == "△")
-cat_bad = sum(1 for r in has_exp if r["分类匹配"] == "❌")
-illegal = [r for r in results if isinstance(r["解析结果"], dict)
-           and r["解析结果"].get("category") not in VALID_CATEGORIES]
-
-print(f"字段完整度：共 {len(results)} 条 ｜ ✅ 七个字段全都有 {ok} 条 ｜ ○ 可选字段为空 {opt} 条 ｜ ❌ 有问题 {bad} 条")
-print("  说明：○ 不是错误 —— 通知里本来就可能没有截止时间/地点/联系人，模型填 null 是对的。")
-
 if has_exp:
-    print(f"分类准确度：共 {len(has_exp)} 条有期望值 ｜ ✅ 完全一致 {cat_ok} 条 ｜ △ 沾边 {cat_fuzzy} 条 ｜ ❌ 不一致 {cat_bad} 条")
+    c_ok = sum(1 for r in has_exp if r["分类匹配"] == "✅")
+    c_fz = sum(1 for r in has_exp if r["分类匹配"] == "△")
+    c_bad = sum(1 for r in has_exp if r["分类匹配"] == "❌")
+    print(
+        f"分类准确度：共 {len(has_exp)} 条有期望值 ｜ ✅ 完全一致 {c_ok} 条"
+        f" ｜ △ 沾边 {c_fz} 条 ｜ ❌ 不一致 {c_bad} 条"
+    )
 
+urgent = sum(
+    1 for r in results if isinstance(r["解析结果"], dict) and r["解析结果"].get("is_urgent") is True
+)
+print(f"判定为紧急（is_urgent=true）的：{urgent} 条")
+
+illegal = [
+    r for r in results
+    if isinstance(r["解析结果"], dict) and r["解析结果"].get("category") not in VALID_CATEGORIES
+]
 if illegal:
     print(f"\n⚠️ 有 {len(illegal)} 条的 category 不在约定的三种里（前端会渲染错位）：")
     for r in illegal:
@@ -247,7 +212,7 @@ if bad:
     print("\n【有问题的条目】")
     for r in results:
         if r["状态"].startswith("❌"):
-            print(f"  #{r['序号']} {r['状态']}  原因：{r['错误'] or ('缺 ' + '/'.join(r['必填字段缺失']))}")
+            print(f"  #{r['序号']} {r['状态']}  原因：{r['错误'] or ('缺 ' + '/'.join(r['缺失字段']))}")
             print(f"      原文：{r['原文']}")
 
 out = Path(__file__).with_name("batch_result.json")
