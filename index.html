@@ -136,7 +136,7 @@
                             <button @click="loadSample(2)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition">2.淘宝发货</button>
                             <button @click="loadSample(5)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition">5.京东垃圾促销</button>
                         </div>
-
+			
                         <button @click="submitNotification" :disabled="loading" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition flex items-center space-x-2 disabled:opacity-50">
                             <span v-if="loading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
                             <span>{{ loading ? 'AI 正在清洗中...' : '智能清洗通知' }}</span>
