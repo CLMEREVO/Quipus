@@ -1,0 +1,13 @@
+# Quipus backend dependencies
+# Render / Railway runs: pip install -r requirements.txt
+#
+# Versions are intentionally unpinned so the build does not fail when a
+# pinned version is missing from the platform's package index.
+# After the first successful deploy, run `pip freeze` locally and pin the
+# actual versions in a follow-up commit for reproducibility.
+
+fastapi
+uvicorn
+requests
+openai
+pydantic
