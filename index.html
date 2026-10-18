@@ -76,7 +76,6 @@
                 </div>
             </div>
         </aside>
-
         <!-- 2. 右侧主内容区 -->
         <main class="flex-1 flex flex-col overflow-y-auto">
             <!-- 顶部导航 -->
@@ -88,7 +87,6 @@
                     </span>
                 </div>
             </header>
-
             <!-- 内容滚动区 -->
             <div class="p-8 space-y-8 max-w-7xl mx-auto w-full">
                 
@@ -116,7 +114,6 @@
                         <div class="p-3 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="bell-ring" class="w-6 h-6"></i></div>
                     </div>
                 </div>
-
                 <!-- 核心输入与测试区 -->
                 <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                     <div class="flex justify-between items-center mb-4">
@@ -143,17 +140,38 @@
                         </button>
                     </div>
                 </div>
-
+		<!-- ========== 新增：多源碎片通知一键聚合Demo ========== -->
+<div class="mt-6 p-4 bg-white rounded-lg shadow border border-slate-200">
+  <button 
+    @click="runAggregateDemo"
+    :disabled="aggLoading"
+    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 transition"
+  >
+    {{ aggLoading ? "聚合中..." : "多源碎片通知一键聚合Demo" }}
+  </button>
+  <!-- 聚合结果大图摘要卡片，有数据才展示 -->
+  <div v-if="aggResult" class="mt-5 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-md">
+    <h3 class="text-xl font-bold text-slate-800 mb-2">{{ aggResult.title }}</h3>
+    <div class="flex gap-2 mb-3">
+      <span 
+        v-for="source in aggResult.sources" 
+        :key="source"
+        class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm"
+      >
+        {{ source }}
+      </span>
+    </div>
+    <p class="text-slate-700 leading-relaxed">{{ aggResult.summary }}</p>
+  </div>
+</div>
                 <!-- 结果展示卡片流区 -->
                 <div class="space-y-4">
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="Layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
-
                     <div v-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
                         暂无通知记录，请在上方的输入框中粘贴通知并点击“智能清洗”！
                     </div>
-
                     <div class="space-y-3">
                         <div v-for="(item, index) in historyList" :key="index" 
                              :class="{
@@ -178,10 +196,8 @@
                                 </div>
                                 <span class="text-xs text-slate-400">原文长度: {{ item.original.length }} 字符</span>
                             </div>
-
                             <h4 class="text-base font-bold text-slate-900 mb-1">{{ item.data.title }}</h4>
                             <p class="text-sm text-slate-600 mb-3 bg-white/60 p-2.5 rounded border border-slate-100">摘要：{{ item.data.summary }}</p>
-
                             <details class="text-xs text-slate-400 cursor-pointer">
                                 <summary class="hover:text-indigo-600">查看原始通知文本</summary>
                                 <p class="mt-1 p-2 bg-slate-100 rounded text-slate-600 font-mono">{{ item.original }}</p>
@@ -189,26 +205,30 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
-
     <!-- Vue 业务逻辑 -->
     <script>
         const { createApp, ref, onMounted, nextTick, watch } = Vue;
-
         createApp({
             setup() {
                 const currentTab = ref('overview');
                 const inputText = ref('');
                 const loading = ref(false);
                 const historyList = ref([]);
-                
+                // 聚合Demo相关
+const aggLoading = ref(false);
+const aggResult = ref(null);
+// 预置碎片通知
+const demoFragmentTexts = ref([
+  "【淘宝网】您购买的商品已发货，顺丰单号：SF123456",
+  "【菜鸟驿站】您的包裹已到达宿舍区驿站，今晚21点前可领取",
+  "【淘宝消息】商家提醒包裹为易碎件，签收前请检查外包装"
+]);
                 // 使用 localStorage 实现“已读状态持久化”，刷新网页后红点不会无故复活
                 const savedReads = JSON.parse(localStorage.getItem('quipus_read_tabs') || '[]');
                 const readTabs = ref(new Set(savedReads));
-
                 const stats = ref({
                     total: 0,
                     urgent: 0,
@@ -216,17 +236,14 @@
                     express: 0,
                     todo: 0
                 });
-
                 const samples = {
                     1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知，请同学们提前做好准备。 ",
                     2: "【淘宝网】亲爱的会员，您购买的羽绒服已由顺丰速运发货，运单号SF12345678，请注意查收。",
                     5: "【京东】您的领券中心掉落一张满199减100元全场通用券，限时2小时领取，点击抢购 https://jd.com/xxx"
                 };
-
                 const loadSample = (id) => {
                     inputText.value = samples[id] || '';
                 };
-
                 const fetchStats = async () => {
                     try {
                         const response = await fetch('https://140b422c.r10.vip.cpolar.cn/api/stats');
@@ -238,7 +255,6 @@
                         console.error('获取统计数据失败:', error);
                     }
                 };
-
                 const fetchHistory = async () => {
                     try {
                         const response = await fetch(`https://140b422c.r10.vip.cpolar.cn/api/history?tab=${currentTab.value}`);
@@ -250,7 +266,6 @@
                         console.error('拉取历史记录失败:', error);
                     }
                 };
-
                 // 监听标签切换：自动将当前 Tab 标记为已读并存入 localStorage
                 watch(currentTab, (newTab) => {
                     if (newTab !== 'overview') {
@@ -260,7 +275,6 @@
                     fetchHistory();
                     fetchStats();
                 });
-
                 // 新增：清空历史记录功能
                 const clearHistory = async () => {
                     if (!confirm('确定要清空后端数据库中的所有历史通知吗？')) return;
@@ -281,7 +295,6 @@
                         alert('清空失败: ' + error.message);
                     }
                 };
-
                 const submitNotification = async () => {
                     if (!inputText.value.trim()) return;
                     loading.value = true;
@@ -296,7 +309,6 @@
                         const resJson = await response.json();
                         const newCategory = resJson.processed_result.category;
                         const isUrgent = resJson.processed_result.is_urgent;
-
                         // 有新通知涌入时，如果用户不在看对应的分类，则把已读状态抹除，让红点重新亮起
                         if (newCategory === '无效广告/促销' && currentTab.value !== 'blocked') {
                             readTabs.value.delete('blocked');
@@ -305,7 +317,6 @@
                             readTabs.value.delete('urgent');
                         }
                         localStorage.setItem('quipus_read_tabs', JSON.stringify(Array.from(readTabs.value)));
-
                         await fetchHistory();
                         await fetchStats();
                         inputText.value = '';
@@ -316,14 +327,41 @@
                         nextTick(() => lucide.createIcons());
                     }
                 };
-
+		// 一键聚合Demo
+const runAggregateDemo = async () => {
+  aggLoading.value = true;
+  aggResult.value = null;
+  try {
+    const res = await fetch("https://140b422c.r10.vip.cpolar.cn/api/aggregate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        fragments: demoFragmentTexts.value
+      })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      aggResult.value = {
+        title: json.title,
+        summary: json.summary,
+        sources: json.sources
+      };
+    }
+  } catch(err) {
+    console.error("聚合请求失败：", err);
+    alert("调用聚合接口失败！请检查cpolar公网链接是否在线、FastAPI后端服务是否正常运行，确认后端 /api/aggregate 接口已部署。");
+  } finally {
+    aggLoading.value = false;
+  }
+};
                 onMounted(() => {
                     lucide.createIcons();
                     loadSample(1);
                     fetchHistory();
                     fetchStats();
                 });
-
                 return {
                     currentTab,
                     inputText,
@@ -333,7 +371,10 @@
                     readTabs,
                     loadSample,
                     submitNotification,
-                    clearHistory
+                    clearHistory,
+		    runAggregateDemo,
+                    aggLoading,
+                    aggResult
                 };
             }
         }).mount('#app');
