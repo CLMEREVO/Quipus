@@ -25,39 +25,55 @@
                     </div>
                 </div>
                 <nav class="p-4 space-y-1">
-                   <div class="space-y-1">
-  <div 
-    @click="currentTab = 'overview'" 
-    :class="currentTab === 'overview' ? 'bg-indigo-600 text-white' : ''"
-    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
-    :class="{'hover:bg-slate-800': currentTab !== 'overview'}"
-  >
-    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-    <span>通知概览</span>
-  </div>
-  <div 
-    @click="currentTab = 'blocked'" 
-    :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : ''"
-    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
-    :class="{'hover:bg-slate-800': currentTab !== 'blocked'}"
-  >
-    <i data-lucide="shield-alert" class="w-5 h-5"></i>
-    <span>已拦截广告</span>
-    <span class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ blockedCount }}</span>
-  </div>
-  <div 
-    @click="currentTab = 'express'" 
-    :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : ''"
-    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
-    :class="{'hover:bg-slate-800': currentTab !== 'express'}"
-  >
-    <i data-lucide="package" class="w-5 h-5"></i>
-    <span>聚合快递与消费</span>
-  </div>
-</div>     </nav>
+                    <div class="space-y-1">
+                        <div 
+                            @click="currentTab = 'overview'" 
+                            :class="currentTab === 'overview' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+                        >
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <span>通知概览</span>
+                        </div>
+                        <div 
+                            @click="currentTab = 'blocked'" 
+                            :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+                        >
+                            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                            <span>已拦截广告</span>
+                            <!-- 只有没被点击查看过（localStorage 里没有记录），且数量大于0时才显示红点 -->
+                            <span v-if="stats.blocked > 0 && !readTabs.has('blocked')" class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.blocked }}</span>
+                        </div>
+                        <div 
+                            @click="currentTab = 'express'" 
+                            :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+                        >
+                            <i data-lucide="package" class="w-5 h-5"></i>
+                            <span>聚合快递与消费</span>
+                        </div>
+                        <div 
+                            @click="currentTab = 'urgent'" 
+                            :class="currentTab === 'urgent' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'"
+                            class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer"
+                        >
+                            <i data-lucide="bell-ring" class="w-5 h-5"></i>
+                            <span>重要/紧急待办</span>
+                            <span v-if="stats.urgent > 0 && !readTabs.has('urgent')" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.urgent }}</span>
+                        </div>
+                    </div>
+                </nav>
             </div>
-            <div class="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-                全国人工智能创新应用大赛 · 其他赛道
+            
+            <!-- 底部增加一个清空历史按钮 -->
+            <div class="p-4 border-t border-slate-800 space-y-3">
+                <button @click="clearHistory" class="w-full bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <span>清空所有历史通知</span>
+                </button>
+                <div class="text-xs text-slate-500 text-center">
+                    全国人工智能创新应用大赛 · 其他赛道
+                </div>
             </div>
         </aside>
 
@@ -77,24 +93,25 @@
             <div class="p-8 space-y-8 max-w-7xl mx-auto w-full">
                 
                 <!-- 统计卡片行 -->
-<div v-show="currentTab === 'overview'" class="grid grid-cols-1 md:grid-cols-3 gap-6">                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div v-show="currentTab === 'overview'" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p class="text-sm text-slate-500 font-medium">今日已处理通知</p>
-                            <h3 class="text-2xl font-bold text-slate-900 mt-1">{{ historyList.length }}</h3>
+                            <h3 class="text-2xl font-bold text-slate-900 mt-1">{{ stats.total }}</h3>
                         </div>
                         <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="activity" class="w-6 h-6"></i></div>
                     </div>
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p class="text-sm text-slate-500 font-medium">拦截垃圾广告/促销</p>
-                            <h3 class="text-2xl font-bold text-rose-600 mt-1">{{ blockedCount }}</h3>
+                            <h3 class="text-2xl font-bold text-rose-600 mt-1">{{ stats.blocked }}</h3>
                         </div>
                         <div class="p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="ban" class="w-6 h-6"></i></div>
                     </div>
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                         <div>
                             <p class="text-sm text-slate-500 font-medium">紧急/重要待办提醒</p>
-                            <h3 class="text-2xl font-bold text-amber-600 mt-1">{{ urgentCount }}</h3>
+                            <h3 class="text-2xl font-bold text-amber-600 mt-1">{{ stats.urgent }}</h3>
                         </div>
                         <div class="p-3 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="bell-ring" class="w-6 h-6"></i></div>
                     </div>
@@ -133,12 +150,12 @@
                         <i data-lucide="Layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
 
-                    <div v-if="filteredList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
+                    <div v-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
                         暂无通知记录，请在上方的输入框中粘贴通知并点击“智能清洗”！
                     </div>
 
                     <div class="space-y-3">
-                        <div v-for="(item, index) in filteredList" :key="index" 
+                        <div v-for="(item, index) in historyList" :key="index" 
                              :class="{
                                 'border-rose-300 bg-rose-50/40': item.data.category === '无效广告/促销',
                                 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/20': item.data.is_urgent,
@@ -179,7 +196,7 @@
 
     <!-- Vue 业务逻辑 -->
     <script>
-        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createApp, ref, onMounted, nextTick, watch } = Vue;
 
         createApp({
             setup() {
@@ -187,8 +204,19 @@
                 const inputText = ref('');
                 const loading = ref(false);
                 const historyList = ref([]);
+                
+                // 使用 localStorage 实现“已读状态持久化”，刷新网页后红点不会无故复活
+                const savedReads = JSON.parse(localStorage.getItem('quipus_read_tabs') || '[]');
+                const readTabs = ref(new Set(savedReads));
 
-                // 队长提供的测试样例库
+                const stats = ref({
+                    total: 0,
+                    urgent: 0,
+                    blocked: 0,
+                    express: 0,
+                    todo: 0
+                });
+
                 const samples = {
                     1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知，请同学们提前做好准备。 ",
                     2: "【淘宝网】亲爱的会员，您购买的羽绒服已由顺丰速运发货，运单号SF12345678，请注意查收。",
@@ -199,17 +227,60 @@
                     inputText.value = samples[id] || '';
                 };
 
-                const blockedCount = computed(() => historyList.value.filter(i => i.data.category === '无效广告/促销').length);
-                const urgentCount = computed(() => historyList.value.filter(i => i.data.is_urgent).length);
-
-                const filteredList = computed(() => {
-                    if (currentTab.value === 'blocked') {
-                        return historyList.value.filter(i => i.data.category === '无效广告/促销');
-                    } else if (currentTab.value === 'express') {
-                        return historyList.value.filter(i => i.data.category === '物流与消费');
+                const fetchStats = async () => {
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/stats');
+                        const resJson = await response.json();
+                        if (resJson.status === 'success') {
+                            stats.value = resJson;
+                        }
+                    } catch (error) {
+                        console.error('获取统计数据失败:', error);
                     }
-                    return historyList.value;
+                };
+
+                const fetchHistory = async () => {
+                    try {
+                        const response = await fetch(`http://127.0.0.1:8000/api/history?tab=${currentTab.value}`);
+                        const resJson = await response.json();
+                        if (resJson.status === 'success') {
+                            historyList.value = resJson.items;
+                        }
+                    } catch (error) {
+                        console.error('拉取历史记录失败:', error);
+                    }
+                };
+
+                // 监听标签切换：自动将当前 Tab 标记为已读并存入 localStorage
+                watch(currentTab, (newTab) => {
+                    if (newTab !== 'overview') {
+                        readTabs.value.add(newTab);
+                        localStorage.setItem('quipus_read_tabs', JSON.stringify(Array.from(readTabs.value)));
+                    }
+                    fetchHistory();
+                    fetchStats();
                 });
+
+                // 新增：清空历史记录功能
+                const clearHistory = async () => {
+                    if (!confirm('确定要清空后端数据库中的所有历史通知吗？')) return;
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/history', {
+                            method: 'DELETE'
+                        });
+                        const resJson = await response.json();
+                        if (resJson.status === 'success') {
+                            historyList.value = [];
+                            // 清空时顺便把已读记录也重置
+                            readTabs.value.clear();
+                            localStorage.removeItem('quipus_read_tabs');
+                            await fetchStats();
+                            alert('历史记录已全部清空！');
+                        }
+                    } catch (error) {
+                        alert('清空失败: ' + error.message);
+                    }
+                };
 
                 const submitNotification = async () => {
                     if (!inputText.value.trim()) return;
@@ -221,16 +292,22 @@
                             body: JSON.stringify({ text: inputText.value })
                         });
                         if (!response.ok) throw new Error('后端接口调用失败');
-                        const resJson = await response.json();
                         
-                        // 适配 Xfurry 后端返回的结构：{ status, raw_text, processed_result }
-                        const formattedItem = {
-                            original: resJson.raw_text,
-                            data: resJson.processed_result
-                        };
+                        const resJson = await response.json();
+                        const newCategory = resJson.processed_result.category;
+                        const isUrgent = resJson.processed_result.is_urgent;
 
-                        // 插入历史列表头部
-                        historyList.value.unshift(formattedItem);
+                        // 有新通知涌入时，如果用户不在看对应的分类，则把已读状态抹除，让红点重新亮起
+                        if (newCategory === '无效广告/促销' && currentTab.value !== 'blocked') {
+                            readTabs.value.delete('blocked');
+                        }
+                        if (isUrgent && currentTab.value !== 'urgent') {
+                            readTabs.value.delete('urgent');
+                        }
+                        localStorage.setItem('quipus_read_tabs', JSON.stringify(Array.from(readTabs.value)));
+
+                        await fetchHistory();
+                        await fetchStats();
                         inputText.value = '';
                     } catch (error) {
                         alert('连接后端失败，请确保 FastAPI 已经在本地 8000 端口启动！\n错误: ' + error.message);
@@ -242,8 +319,9 @@
 
                 onMounted(() => {
                     lucide.createIcons();
-                    // 默认预填一条测试
                     loadSample(1);
+                    fetchHistory();
+                    fetchStats();
                 });
 
                 return {
@@ -251,11 +329,11 @@
                     inputText,
                     loading,
                     historyList,
-                    blockedCount,
-                    urgentCount,
-                    filteredList,
+                    stats,
+                    readTabs,
                     loadSample,
-                    submitNotification
+                    submitNotification,
+                    clearHistory
                 };
             }
         }).mount('#app');
