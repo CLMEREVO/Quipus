@@ -262,7 +262,7 @@
             await fetchHistory();
             inputText.value = '';
         } catch (error) {
-            alert('连接后端失败，请确保 FastAPI 已经在本地 8000 端口启动！\n错误: ' + error.message);
+            alert('连接后端失败，请确保 FastAPI 已经启动！\n错误: ' + error.message);
         } finally {
             loading.value = false;
             nextTick(() => lucide.createIcons());
