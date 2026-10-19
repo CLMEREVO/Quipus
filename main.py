@@ -126,5 +126,11 @@ def delete_history():
     return {"status": "success", "deleted": deleted}
 
 if __name__ == "__main__":
+    import os
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    
+    # 获取 Railway 动态分配的端口（本地没设置时默认 8000）
+    port = int(os.environ.get("PORT", 8000))
+    
+    # 必须绑定 0.0.0.0 才能接收公网流量
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
