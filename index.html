@@ -11,7 +11,7 @@
 <body class="bg-slate-50 text-slate-800 font-sans">
     <div id="app" class="flex h-screen overflow-hidden">
         
-        <!-- 左侧侧边栏：顺序严格按照要求调整 -->
+        <!-- 左侧侧边栏 -->
         <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between hidden md:flex">
             <div>
                 <div class="p-6 flex items-center space-x-3 border-b border-slate-800">
@@ -90,14 +90,14 @@
                     </div>
                 </div>
 
-                <!-- 模拟输入与清洗区 -->
-                <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                <!-- 模拟输入与清洗区 (含恢复到清洗下方的全局聚合 Demo 按钮) -->
+                <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
                     </h3>
                     <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：【班级群】吴狄龙：数据结构作业变成周五之前交！..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
                     
-                    <div class="flex flex-wrap items-center justify-between mt-4 gap-4">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex flex-wrap gap-2">
                             <span class="text-xs text-slate-500 self-center">快捷样例：</span>
                             <button @click="loadSample(1)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">1.停水通知</button>
@@ -109,32 +109,52 @@
                             <span>{{ loading ? 'AI 清洗中...' : '智能清洗通知' }}</span>
                         </button>
                     </div>
+
+                    <!-- 放置回通知概览下方的“一键聚合 Demo”按钮 -->
+                    <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div class="text-xs text-slate-500">多源碎片通知一键聚合演示 (Demo)：将多条同事件通知融合成一张摘要卡片</div>
+                        <button @click="runGlobalAggregation" :disabled="aggLoading" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex items-center space-x-2">
+                            <span v-if="aggLoading" class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
+                            <span>{{ aggLoading ? "AI 聚合中..." : "一键生成全局聚合摘要" }}</span>
+                        </button>
+                    </div>
+
+                    <!-- 聚合结果弹出展示卡片 -->
+                    <div v-if="aggResult" class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <h4 class="font-bold text-sm text-slate-800 mb-1">📦 {{ aggResult.title }}</h4>
+                        <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
+                    </div>
                 </div>
 
-                <!-- 聚合体看板视图 (当点击左侧“聚合体看板”时呈现) -->
+                <!-- 聚合体看板视图 (专属于 express 选项卡：只显示纯聚合摘要卡片) -->
                 <div v-if="currentTab === 'express'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center border-b pb-4">
                         <h3 class="font-bold text-slate-800 flex items-center gap-2">
                             <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Quipus 全局多源聚合态势看板
                         </h3>
-                        <button @click="runGlobalAggregation" :disabled="aggLoading" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
-                            {{ aggLoading ? "正在聚合同步..." : "一键生成全局聚合摘要" }}
-                        </button>
+                        <span class="text-xs text-slate-400">已启用智能去重与多路归并</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-4 bg-slate-50 rounded-lg border">
-                            <h4 class="font-bold text-sm text-slate-700 mb-2">📦 物流与消费聚合流</h4>
-                            <p class="text-xs text-slate-500">已自动合并相同快递单号与多渠道支付成功提醒，减少 60% 冗余通知。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-gradient-to-br from-blue-50/60 to-indigo-50/60 rounded-xl border border-blue-200 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-blue-900 flex items-center gap-2"><i data-lucide="package" class="w-4 h-4"></i> 物流与消费聚合流</span>
+                                <span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">已折叠 3 条冗余</span>
+                            </div>
+                            <p class="text-xs text-slate-600">外卖预计 13:15 送达；顺丰包裹已到南门驿站 (5-2-3008)；微信与招行支付双通道已确认。</p>
                         </div>
-                        <div class="p-4 bg-slate-50 rounded-lg border">
-                            <h4 class="font-bold text-sm text-slate-700 mb-2">🏃 晨跑高频刷脸聚合</h4>
-                            <p class="text-xs text-slate-500">已将同一时间段内多摄像头刷脸成功记录折叠为单张计数卡片。</p>
+                        <div class="p-5 bg-gradient-to-br from-amber-50/60 to-orange-50/60 rounded-xl border border-amber-200 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm text-amber-900 flex items-center gap-2"><i data-lucide="footprints" class="w-4 h-4"></i> 晨跑高频刷脸聚合</span>
+                                <span class="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">已合并 3 次触发</span>
+                            </div>
+                            <p class="text-xs text-slate-600">材料院-图书馆方向起点刷脸成功（同路段多摄像头重复推送已自动聚合为单张计数卡片）。</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- 实时通知流展示区 -->
-                <div class="space-y-4">
+                <!-- 实时通知流展示区 (适用于概览、重要待办、其他类、已拦截广告) -->
+                <div v-if="currentTab !== 'express'" class="space-y-4">
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
@@ -146,7 +166,7 @@
                              :class="{
                                 'border-rose-300 bg-rose-50/40': item.data.category === '无效广告/促销',
                                 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/20': item.data.is_urgent,
-                                'border-blue-300 bg-blue-50/40': item.data.category === '其他类',
+                                'border-blue-300 bg-blue-50/40': item.data.category === '其他类' || item.data.category === '物流与消费',
                                 'border-slate-200 bg-white': !item.data.is_urgent && item.data.category === '重要/紧急待办'
                              }"
                              class="p-5 rounded-xl border shadow-sm transition hover:shadow-md">
@@ -157,7 +177,7 @@
                                     <span class="text-xs px-2 py-0.5 rounded font-medium"
                                           :class="{
                                               'bg-amber-100 text-amber-800': item.data.category === '重要/紧急待办',
-                                              'bg-blue-100 text-blue-800': item.data.category === '其他类',
+                                              'bg-blue-100 text-blue-800': item.data.category === '其他类' || item.data.category === '物流与消费',
                                               'bg-rose-100 text-rose-800': item.data.category === '无效广告/促销'
                                           }">
                                         {{ item.data.category }}
@@ -188,6 +208,7 @@
                 const loading = ref(false);
                 const historyList = ref([]);
                 const aggLoading = ref(false);
+                const aggResult = ref(null);
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
                 const samples = {
@@ -212,6 +233,7 @@
                 };
 
                 const fetchHistory = async () => {
+                    if (currentTab.value === 'express') return; // 聚合体看板不拉取原始流水
                     try {
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${currentTab.value}`);
                         const json = await res.json();
@@ -255,9 +277,9 @@
 
                 const runGlobalAggregation = async () => {
                     aggLoading.value = true;
+                    aggResult.value = null;
                     try {
-                        const texts = historyList.value.map(i => i.original).slice(0, 5);
-                        if (texts.length === 0) { alert('暂无通知可聚合'); return; }
+                        const texts = ["【外卖】美团外卖：美团外卖骑士正在配送黄焖鸡米饭，预计 13:15 送达", "【快递】顺丰包裹已到南门驿站"];
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -265,12 +287,16 @@
                         });
                         const json = await res.json();
                         if (json.status === "success") {
-                            alert(`【全局聚合成功】\n标题：${json.aggregated_result.event_title}\n摘要：${json.aggregated_result.merged_summary}`);
+                            aggResult.value = {
+                                title: json.aggregated_result.event_title,
+                                summary: json.aggregated_result.merged_summary
+                            };
                         }
                     } catch (e) {
                         alert('聚合失败');
                     } finally {
                         aggLoading.value = false;
+                        setTimeout(() => lucide.createIcons(), 100);
                     }
                 };
 
@@ -282,7 +308,7 @@
                 });
 
                 return {
-                    currentTab, inputText, loading, historyList, stats,
+                    currentTab, inputText, loading, historyList, stats, aggResult,
                     loadSample, getTabTitle, submitNotification, clearHistory,
                     runGlobalAggregation, aggLoading
                 };

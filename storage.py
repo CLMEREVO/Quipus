@@ -9,13 +9,13 @@ from typing import Any
 
 DB_PATH = Path(__file__).with_name("quipus.db")
 
-# 标签与数据库分类的映射
-TAB_TO_CATEGORY: dict[str, str | None] = {
-    "overview": None,             # 总览
-    "urgent": "重要/紧急待办",    # 重要/紧急待办
-    "other": "其他类",            # 次重要：外卖、快递、支付等
-    "blocked": "无效广告/促销",   # 已拦截广告
-    "express": "聚合体",          # 全局聚合看板
+# 标签与数据库分类的映射（兼容新老分类字段，防止历史数据冲突）
+TAB_TO_CATEGORY: dict[str, str | list[str] | None] = {
+    "overview": None,
+    "urgent": "重要/紧急待办",
+    "other": ["其他类", "物流与消费"],  # 兼容旧数据的物流/消费与新其他类
+    "blocked": "无效广告/促销",
+    "express": "聚合体",
 }
 
 _INSERT_SQL = """INSERT INTO notifications
@@ -113,11 +113,8 @@ def list_notifications(
     if tab not in TAB_TO_CATEGORY:
         raise ValueError(f"tab 只能是 {sorted(TAB_TO_CATEGORY)}")
     
-    # 聚合体 tab 特殊处理，返回全部数据供前端流式聚合成看板
     if tab == "express":
-        sql = "SELECT * FROM notifications ORDER BY id DESC LIMIT ?"
-        with closing(_connect()) as conn:
-            return [_row_to_item(r) for r in conn.execute(sql, [limit])]
+        return []  # 聚合体看板由前端维护独立的聚合卡片流，不直接读取杂乱原始流
 
     sql = "SELECT * FROM notifications"
     where: list[str] = []
@@ -125,8 +122,14 @@ def list_notifications(
 
     category = TAB_TO_CATEGORY[tab]
     if category:
-        where.append("category = ?")
-        params.append(category)
+        if isinstance(category, list):
+            placeholders = ",".join(["?"] * len(category))
+            where.append(f"category IN ({placeholders})")
+            params.extend(category)
+        else:
+            where.append("category = ?")
+            params.append(category)
+            
     if keyword:
         where.append("(raw_text LIKE ? OR title LIKE ? OR app_name LIKE ?)")
         params += [f"%{keyword}%"] * 3
@@ -152,11 +155,13 @@ def stats() -> dict[str, Any]:
             "SELECT COUNT(*) AS n FROM notifications WHERE is_urgent = 1"
         ).fetchone()["n"]
 
+    other_count = by_cat.get("其他类", 0) + by_cat.get("物流与消费", 0)
+
     return {
         "total": total,
         "urgent": urgent,
         "blocked": by_cat.get("无效广告/促销", 0),
-        "other": by_cat.get("其他类", 0),
+        "other": other_count,
         "by_category": by_cat,
     }
 
