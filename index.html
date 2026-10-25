@@ -46,6 +46,11 @@
                             <i data-lucide="cpu" class="w-5 h-5"></i>
                             <span>聚合体看板</span>
                         </div>
+                        <!-- 新增：自定义规则入口（紧跟在聚合体看板下方） -->
+                        <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                            <i data-lucide="sliders" class="w-5 h-5"></i>
+                            <span>自定义规则</span>
+                        </div>
                     </div>
                 </nav>
             </div>
@@ -95,7 +100,7 @@
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
                     </h3>
-                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
+                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：Steam 促销 / 亲密好友上线提醒..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
                     
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex flex-wrap gap-2">
@@ -119,14 +124,13 @@
                         </button>
                     </div>
 
-                    <!-- 动态摘要卡片 -->
                     <div v-if="aggResult" class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                         <h4 class="font-bold text-sm text-slate-800 mb-1">📦 {{ aggResult.title }}</h4>
                         <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
                     </div>
                 </div>
 
-                <!-- 动态聚合体看板视图 -->
+                <!-- 聚合体看板视图 -->
                 <div v-if="currentTab === 'express'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
                     <div class="flex justify-between items-center border-b pb-4">
                         <h3 class="font-bold text-slate-800 flex items-center gap-2">
@@ -135,24 +139,14 @@
                         <span class="text-xs text-slate-400">自动根据 event_key 聚合高频事件</span>
                     </div>
                     
-                    <!-- 加载中状态，防止闪现 -->
-                    <div v-if="fetchingHistory" class="text-center py-12 text-slate-400">
-                        正在加载聚合数据...
-                    </div>
-
-                    <div v-else-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">
-                        暂无聚合记录，请在“通知概览”中提交通知并进行智能清洗！
-                    </div>
+                    <div v-if="fetchingHistory" class="text-center py-12 text-slate-400">正在加载聚合数据...</div>
+                    <div v-else-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">暂无聚合记录，请在“通知概览”中提交通知并清洗！</div>
 
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div v-for="group in dynamicAggregations" :key="group.key" class="p-5 bg-gradient-to-br from-indigo-50/60 to-blue-50/60 rounded-xl border border-indigo-200 shadow-sm space-y-3">
                             <div class="flex items-center justify-between">
-                                <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
-                                    <i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}
-                                </span>
-                                <span class="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
-                                    已自动聚合 {{ group.count }} 条消息
-                                </span>
+                                <span class="font-bold text-sm text-indigo-900 flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}</span>
+                                <span class="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">已自动聚合 {{ group.count }} 条消息</span>
                             </div>
                             <p class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
                             <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
@@ -160,19 +154,54 @@
                     </div>
                 </div>
 
+                <!-- 自定义规则管理视图 (新增) -->
+                <div v-if="currentTab === 'custom'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+                    <div class="flex justify-between items-center border-b pb-4">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i> 用户自定义通知干预规则
+                        </h3>
+                        <button @click="resetRules" class="px-3 py-1.5 bg-rose-100 text-rose-700 text-xs font-medium rounded-lg hover:bg-rose-200 transition">
+                            恢复默认设置
+                        </button>
+                    </div>
+
+                    <!-- 添加规则面板 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border">
+                        <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 Steam）" class="p-2 border rounded text-xs">
+                        <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 好友上线）" class="p-2 border rounded text-xs">
+                        <select v-model="newRule.targetCat" class="p-2 border rounded text-xs">
+                            <option value="重要/紧急待办">干预为：重要/紧急待办</option>
+                            <option value="其他类消息">干预为：其他类消息</option>
+                            <option value="无效广告/促销">干预为：拦截为广告</option>
+                        </select>
+                        <button @click="addRule" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded font-medium transition">
+                            添加生效规则
+                        </button>
+                    </div>
+
+                    <!-- 规则列表 -->
+                    <div class="space-y-3">
+                        <h4 class="font-bold text-sm text-slate-700">当前生效的自定义策略：</h4>
+                        <div v-if="ruleList.length === 0" class="text-xs text-slate-400 py-6 text-center">暂无自定义规则，系统完全由 AI 默认去噪。</div>
+                        <div v-for="rule in ruleList" :key="rule.id" class="flex items-center justify-between p-3 bg-white border rounded-lg text-xs shadow-sm">
+                            <div class="flex items-center space-x-3">
+                                <span class="font-bold bg-slate-900 text-white px-2 py-0.5 rounded">{{ rule.app_keyword || '全局App' }}</span>
+                                <span class="text-slate-600">包含关键词：<b class="text-indigo-600">"{{ rule.text_keyword }}"</b></span>
+                                <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">重定向至：{{ rule.target_cat }}</span>
+                            </div>
+                            <button @click="deleteRule(rule.id)" class="text-rose-600 hover:underline">删除</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 实时通知流展示区 -->
-                <div v-if="currentTab !== 'express'" class="space-y-4">
+                <div v-if="currentTab !== 'express' && currentTab !== 'custom'" class="space-y-4">
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
                     
-                    <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
-                        正在加载数据...
-                    </div>
-
-                    <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
-                        当前分类下暂无通知记录。
-                    </div>
+                    <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">正在加载数据...</div>
+                    <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">当前分类下暂无通知记录。</div>
 
                     <div v-else class="space-y-3">
                         <div v-for="(item, index) in historyList" :key="index" 
@@ -201,10 +230,6 @@
                             </div>
                             <h4 class="text-base font-bold text-slate-900 mb-1">{{ item.data.title }}</h4>
                             <p class="text-sm text-slate-600 mb-3 bg-white/60 p-2.5 rounded border border-slate-100">摘要：{{ item.data.summary }}</p>
-                            <details class="text-xs text-slate-400 cursor-pointer">
-                                <summary class="hover:text-indigo-600">查看原始通知文本与事件标签</summary>
-                                <p class="mt-1 p-2 bg-slate-100 rounded text-slate-600 font-mono">事件标签: {{ item.data.event_key || '无' }} | 原文: {{ item.original }}</p>
-                            </details>
                         </div>
                     </div>
                 </div>
@@ -219,40 +244,36 @@
                 const currentTab = ref('overview');
                 const inputText = ref('');
                 const loading = ref(false);
-                const fetchingHistory = ref(false); // 新增：控制数据加载状态，彻底杜绝闪现
+                const fetchingHistory = ref(false);
                 const historyList = ref([]);
                 const aggLoading = ref(false);
                 const aggResult = ref(null);
                 const readTabs = ref(new Set());
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
+                // 自定义规则相关状态
+                const ruleList = ref([]);
+                const newRule = ref({ app: '', keyword: '', targetCat: '重要/紧急待办' });
+
                 const samples = {
-                    1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知，请同学们提前做好储水准备。",
+                    1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知。",
                     2: "【班级群】吴狄龙：数据结构作业变成周五之前交！",
-                    3: "【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。起点刷脸6点35到7点10之间有效。"
+                    3: "【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。"
                 };
 
                 const loadSample = (id) => { inputText.value = samples[id] || ''; };
 
                 const getTabTitle = () => {
-                    const titles = { overview: '通知概览', urgent: '重要/紧急待办', other: '其他类消息', blocked: '已拦截广告', express: '聚合体看板' };
+                    const titles = { overview: '通知概览', urgent: '重要/紧急待办', other: '其他类消息', blocked: '已拦截广告', express: '聚合体看板', custom: '自定义规则' };
                     return titles[currentTab.value] || '';
                 };
 
-                // 动态计算聚合体看板内容（自动从后端获取全量数据进行 event_key 归并）
                 const dynamicAggregations = computed(() => {
                     const groups = {};
                     historyList.value.forEach(item => {
                         const key = item.data.event_key || item.data.title || '通用通知';
                         if (!groups[key]) {
-                            groups[key] = {
-                                key,
-                                count: 0,
-                                app: item.data.app_name,
-                                category: item.data.category,
-                                lastSummary: item.data.summary,
-                                lastTime: item.created_at
-                            };
+                            groups[key] = { key, count: 0, lastSummary: item.data.summary, lastTime: item.created_at };
                         }
                         groups[key].count += 1;
                     });
@@ -267,25 +288,63 @@
                     } catch (e) { console.error('获取统计失败', e); }
                 };
 
-                // 异步获取历史数据，增加 fetchingHistory 状态保护
                 const fetchHistory = async () => {
                     fetchingHistory.value = true;
                     try {
-                        // 聚合体看板需要拉取全部数据进行归并，因此传 overview 或特殊处理
                         const targetTab = currentTab.value === 'express' ? 'overview' : currentTab.value;
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${targetTab}&limit=500`);
                         const json = await res.json();
                         if (json.status === 'success') historyList.value = json.items;
-                    } catch (e) { 
-                        console.error('拉取历史失败', e); 
-                    } finally {
-                        fetchingHistory.value = false;
-                    }
+                    } catch (e) { console.error('拉取历史失败', e); }
+                    finally { fetchingHistory.value = false; }
+                };
+
+                // 获取自定义规则
+                const fetchRules = async () => {
+                    try {
+                        const res = await fetch('https://quipus-production.up.railway.app/api/rules');
+                        const json = await res.json();
+                        if (json.status === 'success') ruleList.value = json.rules;
+                    } catch (e) { console.error('获取规则失败', e); }
+                };
+
+                const addRule = async () => {
+                    if (!newRule.value.keyword.trim()) { alert('关键词不能为空！'); return; }
+                    try {
+                        await fetch('https://quipus-production.up.railway.app/api/rules', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                app_keyword: newRule.value.app,
+                                text_keyword: newRule.value.keyword,
+                                target_cat: newRule.value.targetCat
+                            })
+                        });
+                        newRule.value = { app: '', keyword: '', targetCat: '重要/紧急待办' };
+                        fetchRules();
+                        alert('自定义规则添加成功！');
+                    } catch (e) { alert('添加失败'); }
+                };
+
+                const deleteRule = async (id) => {
+                    await fetch(`https://quipus-production.up.railway.app/api/rules/${id}`, { method: 'DELETE' });
+                    fetchRules();
+                };
+
+                const resetRules = async () => {
+                    if (!confirm('确定要恢复默认设置并清空所有自定义规则吗？')) return;
+                    await fetch('https://quipus-production.up.railway.app/api/rules/reset', { method: 'POST' });
+                    fetchRules();
+                    alert('已恢复默认设置！');
                 };
 
                 watch(currentTab, (newTab) => {
                     readTabs.value.add(newTab);
-                    fetchHistory();
+                    if (newTab === 'custom') {
+                        fetchRules();
+                    } else {
+                        fetchHistory();
+                    }
                     fetchStats();
                 });
 
@@ -302,12 +361,8 @@
                         await fetchHistory();
                         await fetchStats();
                         inputText.value = '';
-                    } catch (err) {
-                        alert('清洗失败: ' + err.message);
-                    } finally {
-                        loading.value = false;
-                        setTimeout(() => lucide.createIcons(), 100);
-                    }
+                    } catch (err) { alert('清洗失败: ' + err.message); }
+                    finally { loading.value = false; setTimeout(() => lucide.createIcons(), 100); }
                 };
 
                 const clearHistory = async () => {
@@ -321,12 +376,8 @@
                 };
 
                 const runGlobalAggregation = async () => {
-                    if (historyList.value.length === 0) {
-                        alert('当前暂无任何通知可供聚合，请先清洗提交通知！');
-                        return;
-                    }
+                    if (historyList.value.length === 0) { alert('暂无通知可聚合'); return; }
                     aggLoading.value = true;
-                    aggResult.value = null;
                     try {
                         const realTexts = historyList.value.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
@@ -336,17 +387,10 @@
                         });
                         const json = await res.json();
                         if (json.status === "success") {
-                            aggResult.value = {
-                                title: json.aggregated_result.event_title,
-                                summary: json.aggregated_result.merged_summary
-                            };
+                            aggResult.value = { title: json.aggregated_result.event_title, summary: json.aggregated_result.merged_summary };
                         }
-                    } catch (e) {
-                        alert('聚合失败: ' + e.message);
-                    } finally {
-                        aggLoading.value = false;
-                        setTimeout(() => lucide.createIcons(), 100);
-                    }
+                    } catch (e) { alert('聚合失败'); }
+                    finally { aggLoading.value = false; setTimeout(() => lucide.createIcons(), 100); }
                 };
 
                 onMounted(() => {
@@ -354,12 +398,13 @@
                     loadSample(1);
                     fetchHistory();
                     fetchStats();
+                    fetchRules();
                 });
 
                 return {
                     currentTab, inputText, loading, fetchingHistory, historyList, stats, aggResult, readTabs, dynamicAggregations,
-                    loadSample, getTabTitle, submitNotification, clearHistory,
-                    runGlobalAggregation, aggLoading
+                    ruleList, newRule, addRule, deleteRule, resetRules,
+                    loadSample, getTabTitle, submitNotification, clearHistory, runGlobalAggregation, aggLoading
                 };
             }
         }).mount('#app');

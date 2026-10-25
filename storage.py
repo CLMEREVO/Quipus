@@ -9,18 +9,14 @@ from typing import Any
 
 DB_PATH = Path(__file__).with_name("quipus.db")
 
-# 标签与数据库分类的映射（兼容新老分类字段，防止历史数据冲突）
 TAB_TO_CATEGORY: dict[str, str | list[str] | None] = {
     "overview": None,
     "urgent": "重要/紧急待办",
-    "other": ["其他类", "物流与消费"],  # 兼容旧数据的物流/消费与新其他类
+    "other": ["其他类", "物流与消费"],
     "blocked": "无效广告/促销",
     "express": "聚合体",
+    "custom": None, # 自定义规则页面的数据流由前端或特定接口处理
 }
-
-_INSERT_SQL = """INSERT INTO notifications
-                 (created_at, raw_text, category, is_urgent, app_name, title, result_json)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"""
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS notifications (
@@ -33,8 +29,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     title       TEXT    NOT NULL DEFAULT '',
     result_json TEXT    NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_category ON notifications(category);
-CREATE INDEX IF NOT EXISTS idx_created  ON notifications(id DESC);
+
+CREATE TABLE IF NOT EXISTS custom_rules (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_keyword  TEXT    NOT NULL DEFAULT '',
+    text_keyword TEXT    NOT NULL,
+    target_cat   TEXT    NOT NULL,
+    is_urgent    INTEGER NOT NULL DEFAULT 0
+);
 """
 
 def _connect() -> sqlite3.Connection:
@@ -46,6 +48,24 @@ def init_db() -> None:
     with closing(_connect()) as conn:
         with conn:
             conn.executescript(_SCHEMA)
+
+def apply_custom_rules(app_name: str, raw_text: str, result: dict[str, Any]) -> dict[str, Any]:
+    """优先应用用户的自定义规则重定向通知分类与紧急度"""
+    with closing(_connect()) as conn:
+        rules = conn.execute("SELECT * FROM custom_rules").fetchall()
+        for r in rules:
+            app_kw = r["app_keyword"].strip()
+            text_kw = r["text_keyword"].strip()
+            
+            app_matched = (not app_kw) or (app_kw in app_name)
+            text_matched = text_kw in raw_text
+            
+            if app_matched and text_matched:
+                result["category"] = r["target_cat"]
+                result["is_urgent"] = bool(r["is_urgent"])
+                result["summary"] = f"[用户自定义规则命中] {result.get('summary', '')}"
+                break
+    return result
 
 def _row_to_item(row: sqlite3.Row) -> dict[str, Any]:
     return {
@@ -67,43 +87,18 @@ def _to_row(created_at: str, raw_text: str, result: dict[str, Any]) -> tuple:
     )
 
 def save_notification(raw_text: str, result: dict[str, Any]) -> dict[str, Any]:
+    # 核心：入库前先过一遍用户自定义规则
+    app_name = str(result.get("app_name") or "")
+    result = apply_custom_rules(app_name, raw_text, result)
+    
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with closing(_connect()) as conn:
         with conn:
-            cur = conn.execute(_INSERT_SQL, _to_row(now, raw_text, result))
+            cur = conn.execute(_INSERT_SQL := """INSERT INTO notifications
+                             (created_at, raw_text, category, is_urgent, app_name, title, result_json)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)""", _to_row(now, raw_text, result))
             row_id = cur.lastrowid
     return {"id": row_id, "created_at": now, "original": raw_text, "data": result}
-
-def save_many_if_empty(
-    items: list[tuple[str, dict[str, Any]]],
-    created_ats: list[str] | None = None,
-) -> int:
-    if not items:
-        return 0
-    conn = sqlite3.connect(DB_PATH, timeout=30, isolation_level=None)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        existing = conn.execute("SELECT COUNT(*) AS n FROM notifications").fetchone()["n"]
-        if existing:
-            conn.execute("ROLLBACK")
-            return 0
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        rows = [
-            _to_row(created_ats[i] if created_ats else now, raw, result)
-            for i, (raw, result) in enumerate(items)
-        ]
-        conn.executemany(_INSERT_SQL, rows)
-        conn.execute("COMMIT")
-        return len(rows)
-    except Exception:
-        try:
-            conn.execute("ROLLBACK")
-        except Exception:
-            pass
-        raise
-    finally:
-        conn.close()
 
 def list_notifications(
     tab: str = "overview",
@@ -114,7 +109,7 @@ def list_notifications(
         raise ValueError(f"tab 只能是 {sorted(TAB_TO_CATEGORY)}")
     
     if tab == "express":
-        return []  # 聚合体看板由前端维护独立的聚合卡片流，不直接读取杂乱原始流
+        return []
 
     sql = "SELECT * FROM notifications"
     where: list[str] = []
@@ -171,3 +166,30 @@ def clear() -> int:
             n = conn.execute("SELECT COUNT(*) AS n FROM notifications").fetchone()["n"]
             conn.execute("DELETE FROM notifications")
     return n
+
+# 自定义规则数据库操作
+def get_custom_rules() -> list[dict[str, Any]]:
+    with closing(_connect()) as conn:
+        rows = conn.execute("SELECT * FROM custom_rules ORDER BY id DESC").fetchall()
+        return [dict(r) for r in rows]
+
+def add_custom_rule(app_keyword: str, text_keyword: str, target_cat: str) -> int:
+    is_urgent = 1 if target_cat == "重要/紧急待办" else 0
+    with closing(_connect()) as conn:
+        with conn:
+            cur = conn.execute(
+                "INSERT INTO custom_rules (app_keyword, text_keyword, target_cat, is_urgent) VALUES (?, ?, ?, ?)",
+                (app_keyword, text_keyword, target_cat, is_urgent)
+            )
+            return cur.lastrowid
+
+def delete_custom_rule(rule_id: int) -> int:
+    with closing(_connect()) as conn:
+        with conn:
+            conn.execute("DELETE FROM custom_rules WHERE id = ?", (rule_id,))
+    return rule_id
+
+def reset_custom_rules() -> None:
+    with closing(_connect()) as conn:
+        with conn:
+            conn.execute("DELETE FROM custom_rules")
