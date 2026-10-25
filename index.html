@@ -135,7 +135,12 @@
                         <span class="text-xs text-slate-400">自动根据 event_key 聚合高频事件</span>
                     </div>
                     
-                    <div v-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">
+                    <!-- 加载中状态，防止闪现 -->
+                    <div v-if="fetchingHistory" class="text-center py-12 text-slate-400">
+                        正在加载聚合数据...
+                    </div>
+
+                    <div v-else-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">
                         暂无聚合记录，请在“通知概览”中提交通知并进行智能清洗！
                     </div>
 
@@ -160,10 +165,16 @@
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
-                    <div v-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
+                    
+                    <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
+                        正在加载数据...
+                    </div>
+
+                    <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">
                         当前分类下暂无通知记录。
                     </div>
-                    <div class="space-y-3">
+
+                    <div v-else class="space-y-3">
                         <div v-for="(item, index) in historyList" :key="index" 
                              :class="{
                                 'border-rose-300 bg-rose-50/40': item.data.category === '无效广告/促销',
@@ -208,6 +219,7 @@
                 const currentTab = ref('overview');
                 const inputText = ref('');
                 const loading = ref(false);
+                const fetchingHistory = ref(false); // 新增：控制数据加载状态，彻底杜绝闪现
                 const historyList = ref([]);
                 const aggLoading = ref(false);
                 const aggResult = ref(null);
@@ -227,7 +239,7 @@
                     return titles[currentTab.value] || '';
                 };
 
-                // 动态计算聚合体看板内容（根据 event_key 归并）
+                // 动态计算聚合体看板内容（自动从后端获取全量数据进行 event_key 归并）
                 const dynamicAggregations = computed(() => {
                     const groups = {};
                     historyList.value.forEach(item => {
@@ -255,16 +267,24 @@
                     } catch (e) { console.error('获取统计失败', e); }
                 };
 
+                // 异步获取历史数据，增加 fetchingHistory 状态保护
                 const fetchHistory = async () => {
+                    fetchingHistory.value = true;
                     try {
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${currentTab.value}`);
+                        // 聚合体看板需要拉取全部数据进行归并，因此传 overview 或特殊处理
+                        const targetTab = currentTab.value === 'express' ? 'overview' : currentTab.value;
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${targetTab}&limit=500`);
                         const json = await res.json();
                         if (json.status === 'success') historyList.value = json.items;
-                    } catch (e) { console.error('拉取历史失败', e); }
+                    } catch (e) { 
+                        console.error('拉取历史失败', e); 
+                    } finally {
+                        fetchingHistory.value = false;
+                    }
                 };
 
                 watch(currentTab, (newTab) => {
-                    readTabs.value.add(newTab); // 点击Tab即消除该Tab角标
+                    readTabs.value.add(newTab);
                     fetchHistory();
                     fetchStats();
                 });
@@ -300,7 +320,6 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
-                // 使用当前库中的真实数据动态请求聚合 API
                 const runGlobalAggregation = async () => {
                     if (historyList.value.length === 0) {
                         alert('当前暂无任何通知可供聚合，请先清洗提交通知！');
@@ -338,7 +357,7 @@
                 });
 
                 return {
-                    currentTab, inputText, loading, historyList, stats, aggResult, readTabs, dynamicAggregations,
+                    currentTab, inputText, loading, fetchingHistory, historyList, stats, aggResult, readTabs, dynamicAggregations,
                     loadSample, getTabTitle, submitNotification, clearHistory,
                     runGlobalAggregation, aggLoading
                 };
