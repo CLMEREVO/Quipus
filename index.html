@@ -30,17 +30,17 @@
                         <div @click="currentTab = 'urgent'" :class="currentTab === 'urgent' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="bell-ring" class="w-5 h-5"></i>
                             <span>重要/紧急待办</span>
-                            <span v-if="stats.urgent > 0" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.urgent }}</span>
+                            <span v-if="stats.urgent > 0 && !readTabs.has('urgent')" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.urgent }}</span>
                         </div>
                         <div @click="currentTab = 'other'" :class="currentTab === 'other' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="layers" class="w-5 h-5"></i>
                             <span>其他类消息</span>
-                            <span v-if="stats.other > 0" class="ml-auto bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.other }}</span>
+                            <span v-if="stats.other > 0 && !readTabs.has('other')" class="ml-auto bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.other }}</span>
                         </div>
                         <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="shield-alert" class="w-5 h-5"></i>
                             <span>已拦截广告</span>
-                            <span v-if="stats.blocked > 0" class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.blocked }}</span>
+                            <span v-if="stats.blocked > 0 && !readTabs.has('blocked')" class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.blocked }}</span>
                         </div>
                         <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="cpu" class="w-5 h-5"></i>
@@ -95,7 +95,7 @@
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
                     </h3>
-                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：【班级群】吴狄龙：数据结构作业变成周五之前交！..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
+                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
                     
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex flex-wrap gap-2">
@@ -112,7 +112,7 @@
 
                     <!-- 全局聚合 Demo 按钮区 -->
                     <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <div class="text-xs text-slate-500">多源碎片通知一键聚合演示 (Demo)：将多条同事件通知融合成一张摘要卡片</div>
+                        <div class="text-xs text-slate-500">多源碎片通知一键聚合演示 (Demo)：根据当前提交的所有通知动态生成摘要</div>
                         <button @click="runGlobalAggregation" :disabled="aggLoading" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex items-center space-x-2">
                             <span v-if="aggLoading" class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
                             <span>{{ aggLoading ? "AI 聚合中..." : "一键生成全局聚合摘要" }}</span>
@@ -126,34 +126,31 @@
                     </div>
                 </div>
 
-                <!-- 聚合体看板视图 -->
+                <!-- 动态聚合体看板视图 -->
                 <div v-if="currentTab === 'express'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
                     <div class="flex justify-between items-center border-b pb-4">
                         <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Quipus 全局多源聚合态势看板
+                            <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Quipus 全局多源实时聚合看板
                         </h3>
-                        <span class="text-xs text-slate-400">已启用智能去重与多路归并</span>
+                        <span class="text-xs text-slate-400">自动根据 event_key 聚合高频事件</span>
                     </div>
                     
-                    <!-- 动态判断：清空后展示提示，有数据时展示看板卡片 -->
-                    <div v-if="!hasAggregatedData" class="text-center py-12 text-slate-400">
-                        暂无聚合记录，请在“通知概览”中点击“一键生成全局聚合摘要”或提交新通知！
+                    <div v-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">
+                        暂无聚合记录，请在“通知概览”中提交通知并进行智能清洗！
                     </div>
 
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="p-5 bg-gradient-to-br from-blue-50/60 to-indigo-50/60 rounded-xl border border-blue-200 shadow-sm space-y-3">
+                        <div v-for="group in dynamicAggregations" :key="group.key" class="p-5 bg-gradient-to-br from-indigo-50/60 to-blue-50/60 rounded-xl border border-indigo-200 shadow-sm space-y-3">
                             <div class="flex items-center justify-between">
-                                <span class="font-bold text-sm text-blue-900 flex items-center gap-2"><i data-lucide="package" class="w-4 h-4"></i> 物流与消费聚合流</span>
-                                <span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">已折叠 3 条冗余</span>
+                                <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                    <i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}
+                                </span>
+                                <span class="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                    已自动聚合 {{ group.count }} 条消息
+                                </span>
                             </div>
-                            <p class="text-xs text-slate-600">外卖预计 13:15 送达；顺丰包裹已到南门驿站 (5-2-3008)；微信与招行支付双通道已确认。</p>
-                        </div>
-                        <div class="p-5 bg-gradient-to-br from-amber-50/60 to-orange-50/60 rounded-xl border border-amber-200 shadow-sm space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="font-bold text-sm text-amber-900 flex items-center gap-2"><i data-lucide="footprints" class="w-4 h-4"></i> 晨跑高频刷脸聚合</span>
-                                <span class="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold">已合并 3 次触发</span>
-                            </div>
-                            <p class="text-xs text-slate-600">材料院-图书馆方向起点刷脸成功（同路段多摄像头重复推送已自动聚合为单张计数卡片）。</p>
+                            <p class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
+                            <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
                         </div>
                     </div>
                 </div>
@@ -205,7 +202,7 @@
     </div>
 
     <script>
-        const { createApp, ref, onMounted, watch } = Vue;
+        const { createApp, ref, computed, onMounted, watch } = Vue;
         createApp({
             setup() {
                 const currentTab = ref('overview');
@@ -214,7 +211,7 @@
                 const historyList = ref([]);
                 const aggLoading = ref(false);
                 const aggResult = ref(null);
-                const hasAggregatedData = ref(true); // 控制聚合看板是否有数据的标记
+                const readTabs = ref(new Set());
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
                 const samples = {
@@ -230,6 +227,26 @@
                     return titles[currentTab.value] || '';
                 };
 
+                // 动态计算聚合体看板内容（根据 event_key 归并）
+                const dynamicAggregations = computed(() => {
+                    const groups = {};
+                    historyList.value.forEach(item => {
+                        const key = item.data.event_key || item.data.title || '通用通知';
+                        if (!groups[key]) {
+                            groups[key] = {
+                                key,
+                                count: 0,
+                                app: item.data.app_name,
+                                category: item.data.category,
+                                lastSummary: item.data.summary,
+                                lastTime: item.created_at
+                            };
+                        }
+                        groups[key].count += 1;
+                    });
+                    return Object.values(groups);
+                });
+
                 const fetchStats = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/stats');
@@ -239,7 +256,6 @@
                 };
 
                 const fetchHistory = async () => {
-                    if (currentTab.value === 'express') return;
                     try {
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${currentTab.value}`);
                         const json = await res.json();
@@ -247,7 +263,8 @@
                     } catch (e) { console.error('拉取历史失败', e); }
                 };
 
-                watch(currentTab, () => {
+                watch(currentTab, (newTab) => {
+                    readTabs.value.add(newTab); // 点击Tab即消除该Tab角标
                     fetchHistory();
                     fetchStats();
                 });
@@ -273,26 +290,30 @@
                     }
                 };
 
-                // 清空函数：彻底重置所有内存卡片状态
                 const clearHistory = async () => {
                     if (!confirm('确定清空所有历史通知吗？')) return;
                     await fetch('https://quipus-production.up.railway.app/api/history', { method: 'DELETE' });
                     historyList.value = [];
-                    aggResult.value = null;           // 1. 清空概览页摘要卡片
-                    hasAggregatedData.value = false;  // 2. 清空聚合看板视图
+                    aggResult.value = null;
+                    readTabs.value.clear();
                     await fetchStats();
-                    alert('所有历史通知与聚合记录已彻底清空！');
+                    alert('已彻底清空所有通知与聚合卡片！');
                 };
 
+                // 使用当前库中的真实数据动态请求聚合 API
                 const runGlobalAggregation = async () => {
+                    if (historyList.value.length === 0) {
+                        alert('当前暂无任何通知可供聚合，请先清洗提交通知！');
+                        return;
+                    }
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        const texts = ["【外卖】美团外卖：美团外卖骑士正在配送黄焖鸡米饭，预计 13:15 送达", "【快递】顺丰包裹已到南门驿站"];
+                        const realTexts = historyList.value.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ notifications: texts })
+                            body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
                         if (json.status === "success") {
@@ -300,10 +321,9 @@
                                 title: json.aggregated_result.event_title,
                                 summary: json.aggregated_result.merged_summary
                             };
-                            hasAggregatedData.value = true; // 3. 聚合后重新呈现看板卡片
                         }
                     } catch (e) {
-                        alert('聚合失败');
+                        alert('聚合失败: ' + e.message);
                     } finally {
                         aggLoading.value = false;
                         setTimeout(() => lucide.createIcons(), 100);
@@ -318,7 +338,7 @@
                 });
 
                 return {
-                    currentTab, inputText, loading, historyList, stats, aggResult, hasAggregatedData,
+                    currentTab, inputText, loading, historyList, stats, aggResult, readTabs, dynamicAggregations,
                     loadSample, getTabTitle, submitNotification, clearHistory,
                     runGlobalAggregation, aggLoading
                 };
