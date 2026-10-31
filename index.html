@@ -100,7 +100,7 @@
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
                     </h3>
-                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：Steam 促销 / 亲密好友上线提醒..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
+                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：淘宝 促销 / 快递到站提醒..." class="w-full p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
                     
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div class="flex flex-wrap gap-2">
@@ -167,8 +167,8 @@
 
                     <!-- 添加规则面板 -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border">
-                        <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 Steam）" class="p-2 border rounded text-xs">
-                        <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 好友上线）" class="p-2 border rounded text-xs">
+                        <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 企业微信）" class="p-2 border rounded text-xs">
+                        <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 行业资讯）" class="p-2 border rounded text-xs">
                         <select v-model="newRule.targetCat" class="p-2 border rounded text-xs">
                             <option value="重要/紧急待办">定义为：重要/紧急待办</option>
                             <option value="其他类消息">定义为：其他类消息</option>
