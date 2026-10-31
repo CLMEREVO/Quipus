@@ -39,17 +39,17 @@
                         </div>
                         <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="shield-alert" class="w-5 h-5"></i>
-                            <span>已拦截广告</span>
+                            <span>拦截类消息</span>
                             <span v-if="stats.blocked > 0 && !readTabs.has('blocked')" class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.blocked }}</span>
                         </div>
                         <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="cpu" class="w-5 h-5"></i>
-                            <span>聚合体看板</span>
+                            <span>聚合体</span>
                         </div>
                         <!-- 新增：自定义规则入口（紧跟在聚合体看板下方） -->
                         <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="sliders" class="w-5 h-5"></i>
-                            <span>自定义规则</span>
+                            <span>自定义类</span>
                         </div>
                     </div>
                 </nav>
@@ -82,7 +82,7 @@
                         <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="activity" class="w-6 h-6"></i></div>
                     </div>
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div><p class="text-sm text-slate-500">重要待办</p><h3 class="text-2xl font-bold text-amber-600 mt-1">{{ stats.urgent }}</h3></div>
+                        <div><p class="text-sm text-slate-500">重要消息</p><h3 class="text-2xl font-bold text-amber-600 mt-1">{{ stats.urgent }}</h3></div>
                         <div class="p-3 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="bell-ring" class="w-6 h-6"></i></div>
                     </div>
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -90,7 +90,7 @@
                         <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="layers" class="w-6 h-6"></i></div>
                     </div>
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div><p class="text-sm text-slate-500">已拦截广告</p><h3 class="text-2xl font-bold text-rose-600 mt-1">{{ stats.blocked }}</h3></div>
+                        <div><p class="text-sm text-slate-500">已拦截</p><h3 class="text-2xl font-bold text-rose-600 mt-1">{{ stats.blocked }}</h3></div>
                         <div class="p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="ban" class="w-6 h-6"></i></div>
                     </div>
                 </div>
@@ -106,8 +106,8 @@
                         <div class="flex flex-wrap gap-2">
                             <span class="text-xs text-slate-500 self-center">快捷样例：</span>
                             <button @click="loadSample(1)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">1.停水通知</button>
-                            <button @click="loadSample(2)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">2.数据结构作业更改</button>
-                            <button @click="loadSample(3)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">3.晨跑刷脸重复</button>
+                            <button @click="loadSample(2)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">2.作业截止</button>
+                            <button @click="loadSample(3)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">3.晨跑刷脸</button>
                         </div>
                         <button @click="submitNotification" :disabled="loading" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition flex items-center space-x-2 disabled:opacity-50">
                             <span v-if="loading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
@@ -170,12 +170,12 @@
                         <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 Steam）" class="p-2 border rounded text-xs">
                         <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 好友上线）" class="p-2 border rounded text-xs">
                         <select v-model="newRule.targetCat" class="p-2 border rounded text-xs">
-                            <option value="重要/紧急待办">干预为：重要/紧急待办</option>
-                            <option value="其他类消息">干预为：其他类消息</option>
-                            <option value="无效广告/促销">干预为：拦截为广告</option>
+                            <option value="重要/紧急待办">定义为：重要/紧急待办</option>
+                            <option value="其他类消息">定义为：其他类消息</option>
+                            <option value="无效广告/促销">定义为：拦截类消息</option>
                         </select>
                         <button @click="addRule" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded font-medium transition">
-                            添加生效规则
+                            添加自定义
                         </button>
                     </div>
 
@@ -257,14 +257,14 @@
 
                 const samples = {
                     1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知。",
-                    2: "【班级群】吴狄龙：数据结构作业变成周五之前交！",
+                    2: "【慕课】单元测验即将截止，注意按时完成。",
                     3: "【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。"
                 };
 
                 const loadSample = (id) => { inputText.value = samples[id] || ''; };
 
                 const getTabTitle = () => {
-                    const titles = { overview: '通知概览', urgent: '重要/紧急待办', other: '其他类消息', blocked: '已拦截广告', express: '聚合体看板', custom: '自定义规则' };
+                    const titles = { overview: '通知概览', urgent: '重要/紧急待办', other: '其他类消息', blocked: '拦截类消息', express: '聚合体', custom: '自定义类' };
                     return titles[currentTab.value] || '';
                 };
 
