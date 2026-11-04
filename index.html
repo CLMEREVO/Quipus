@@ -277,11 +277,8 @@
                         const cat = item.data.category;
                         const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
                         
-                        // 1. 拦截类消息：统一归并为 "已拦截的消息"
                         let key = isBlocked ? '已拦截的消息' : (item.data.event_key || item.data.title || '通用通知');
                         
-                        // 2. 核心优化：将所有支付、消费、充值、账单类的通知（无论金额大小、时间先后），
-                        // 统一在聚合体看板中归并为一张 "今日消费与支付账单" 大卡片，实现类似微信记账报的效果！
                         const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
                         const isFinancialPayment = cat === '其他类' && (
                             textToCheck.includes('支付') || 
@@ -300,17 +297,33 @@
                             groups[key] = { 
                                 key: key, 
                                 count: 0, 
-                                lastSummary: isBlocked ? '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。' : item.data.summary, 
+                                totalAmount: 0, // 新增：累计总金额
+                                lastSummary: '', 
                                 lastTime: item.created_at 
                             };
                         }
                         
                         groups[key].count += 1;
                         
-                        // 如果是支付账单类，我们可以把摘要优化得更有“记账报”的统计感
+                        // 智能正则提取当前通知中的金额（如 50.00元、1000元、¥50 等）
+                        const fullText = item.data.title + " " + item.data.summary + " " + item.original;
+                        const moneyMatches = fullText.match(/(\d+(?:\.\d+)?)\s*(?:元|RMB|￥|\b)/g);
+                        if (moneyMatches) {
+                            moneyMatches.forEach(m => {
+                                const val = parseFloat(m);
+                                if (!isNaN(val) && val < 100000) { // 过滤掉过大的数字防止误判
+                                    groups[key].totalAmount += val;
+                                }
+                            });
+                        }
+                        
+                        // 如果是支付账单类，动态生成带有“总消费金额”的记账报摘要
                         if (isFinancialPayment) {
-                            groups[key].lastSummary = `今日已成功聚合 ${groups[key].count} 笔支付与账单通知，已为您实现多源应用统一流水汇总。`;
-                        } else if (!isBlocked) {
+                            const amountStr = groups[key].totalAmount > 0 ? `，今日累计支出 ¥${groups[key].totalAmount.toFixed(2)}` : '';
+                            groups[key].lastSummary = `今日已成功聚合 ${groups[key].count} 笔支付与账单通知${amountStr}，已实现多源应用统一流水汇总。`;
+                        } else if (isBlocked) {
+                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
+                        } else {
                             groups[key].lastSummary = item.data.summary;
                         }
                         
