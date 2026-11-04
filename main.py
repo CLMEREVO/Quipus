@@ -1,11 +1,3 @@
-r"""Quipus 后端 —— 通知解析 + 历史存储 + 多 Tab 筛选 + 多源聚合 + 自定义规则
-
-分工：
-    test_ai.py   （队长维护）提供 clean_notification_text / aggregate_notifications
-    main.py      （Xfurry 负责）对外提供 HTTP 接口
-    storage.py   （Xfurry 负责）SQLite 存储层
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -16,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from seed import seed_if_empty
+from seed import seed_if_empty, force_seed_samples
 from storage import (
     TAB_TO_CATEGORY,
     clear,
@@ -42,14 +34,14 @@ def _load_captain_functions():
         agg_fn = getattr(mod, "aggregate_notifications", None)
         if clean_fn:
             return clean_fn, agg_fn
-    raise ImportError("找不到队长的清洗函数。请确认 test_ai.py 在本目录下。")
+    raise ImportError("找不到清洗函数。")
 
 clean_notification_text, aggregate_notifications = _load_captain_functions()
 
 app = FastAPI(
     title="Quipus Backend",
     description="智能信息去噪与聚合系统后端 API",
-    version="0.6.0",
+    version="0.7.0",
 )
 
 app.add_middleware(
@@ -62,7 +54,6 @@ app.add_middleware(
 
 seed_if_empty()
 
-# --- 请求体数据模型 ---
 class NotificationRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
@@ -74,7 +65,6 @@ class RuleRequest(BaseModel):
     text_keyword: str = Field(..., min_length=1)
     target_cat: str = Field(..., min_length=1)
 
-# --- API 路由 ---
 @app.get("/")
 def read_root():
     return {"message": "Quipus Backend is running successfully!"}
@@ -117,7 +107,7 @@ def get_history(
     q: str | None = Query(None),
 ):
     if tab not in TAB_TO_CATEGORY:
-        raise HTTPException(status_code=400, detail="tab 非法")
+        raise HTTPException(status_code=400, detail=f"tab 非法")
     items = list_notifications(tab=tab, limit=limit, keyword=q)
     return {
         "status": "success",
@@ -136,7 +126,11 @@ def delete_history():
     deleted = clear()
     return {"status": "success", "deleted": deleted}
 
-# --- 自定义规则管理路由 ---
+@app.post("/api/seed/refresh")
+def refresh_seed():
+    added = force_seed_samples()
+    return {"status": "success", "added_count": added, "message": f"成功补充了 {added} 条测试示例"}
+
 @app.get("/api/rules")
 def list_rules():
     return {"status": "success", "rules": get_custom_rules()}

@@ -8,9 +8,9 @@ def clean_notification_text(raw_notification: str) -> dict:
     返回标准的 Python 字典（Dict）
     """
     client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"), 
-    base_url="https://api.deepseek.com"
-)
+        api_key=os.getenv("DEEPSEEK_API_KEY"), 
+        base_url="https://api.deepseek.com"
+    )
 
     system_prompt = """
     你是一个智能信息去噪与聚合系统的核心大脑。请对输入的手机原始通知文本进行语义理解、意图分类与信息提取。
@@ -58,27 +58,31 @@ def aggregate_notifications(notification_list: list) -> dict:
     接收多条同一事件的原始通知文本列表，进行去重、融合与流式聚合
     """
     client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"), 
-    base_url="https://api.deepseek.com"
-)
+        api_key=os.getenv("DEEPSEEK_API_KEY"), 
+        base_url="https://api.deepseek.com"
+    )
 
     prompt = f"""
-    以下是用户针对同一类事件（如快递、外卖、刷脸或支付）收到的多条碎片化通知：
+    以下是用户收到的多条碎片化通知：
     {notification_list}
     
-    请帮用户进行多源聚合，生成一条精简的综合摘要卡片。必须严格输出以下 JSON 格式：
-    {{
-      "event_title": "事件主标题（例如：今日晨跑刷脸已完成 / 您的多个快递已到达驿站）",
-      "merged_summary": "融合后的综合摘要，包含最新状态、接收次数或累计信息",
+    请判断这些通知的属性并进行聚合：
+    1. 如果这些通知大部分属于营销、优惠券、促销或广告等【无效广告/促销】类，请进行“粗聚合”，不要罗列具体商品，主标题(event_title)必须固定为 "已拦截的消息"，摘要(merged_summary)必须笼统概括为诸如 "来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截" 的形式，绝不能出现“建议领取”等诱导文案。
+    2. 如果是正常的快递、外卖、作业或刷脸等通知，则正常生成详细的事件主标题与融合摘要。
+
+    必须严格输出以下 JSON 格式：
+    {
+      "event_title": "事件主标题",
+      "merged_summary": "融合后的综合摘要",
       "source_apps": ["应用1", "应用2"]
-    }}
+    }
     """
 
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "你是一个多源信息聚和专家。"},
+                {"role": "system", "content": "你是一个多源信息聚合与安全过滤专家。"},
                 {"role": "user", "content": prompt}
             ],
             response_format={ "type": "json_object" },
