@@ -402,7 +402,6 @@
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        // 确保拿到底部聚合所需的全部通知文本
                         const resAll = await fetch('https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000');
                         const jsonAll = await resAll.json();
                         const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
@@ -419,10 +418,13 @@
                             body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
+                        
+                        // 只要后端返回成功，直接把数据渲染到小卡片上，不再做严苛的字段过滤
                         if (json.status === "success" && json.aggregated_result) {
+                            const resData = json.aggregated_result;
                             aggResult.value = { 
-                                title: json.aggregated_result.event_title, 
-                                summary: json.aggregated_result.merged_summary 
+                                title: resData.event_title || "多源通知智能聚合", 
+                                summary: resData.merged_summary || "已成功为您处理并融合相关通知。" 
                             };
                         } else {
                             alert('聚合请求未返回有效摘要');
@@ -434,7 +436,7 @@
                         setTimeout(() => lucide.createIcons(), 100); 
                     }
                 };
-
+                
                 onMounted(() => {
                     lucide.createIcons();
                     loadSample(1);

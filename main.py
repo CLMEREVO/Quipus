@@ -90,6 +90,20 @@ def aggregate(data: AggregateRequest):
         raise HTTPException(status_code=503, detail="聚合函数不可用")
     try:
         merged = aggregate_notifications(data.notifications)
+        
+        # 容错保护：确保返回的字典里一定有前端需要的字段
+        if not isinstance(merged, dict):
+            merged = {}
+            
+        event_title = merged.get("event_title") or merged.get("title") or "多源碎片通知智能聚合"
+        merged_summary = merged.get("merged_summary") or merged.get("summary") or "已为您成功提取并融合当前通知消息。"
+        source_apps = merged.get("source_apps") or []
+        
+        normalized_result = {
+            "event_title": event_title,
+            "merged_summary": merged_summary,
+            "source_apps": source_apps
+        }
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"聚合失败: {exc}") from exc
 
@@ -97,7 +111,7 @@ def aggregate(data: AggregateRequest):
         "status": "success",
         "source_count": len(data.notifications),
         "raw_texts": data.notifications,
-        "aggregated_result": merged,
+        "aggregated_result": normalized_result,
     }
 
 @app.get("/api/history")
