@@ -459,6 +459,19 @@
                             return;
                         }
 
+                        // 前端本地也对所有通知做一次金额统计算法，确保万无一失
+                        let totalSum = 0;
+                        allItems.forEach(item => {
+                            const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
+                            const matches = fullText.match(/(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g);
+                            if (matches) {
+                                matches.forEach(m => {
+                                    const v = parseFloat(m);
+                                    if (!isNaN(v) && v < 100000) totalSum += v;
+                                });
+                            }
+                        });
+
                         const realTexts = allItems.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
@@ -468,9 +481,13 @@
                         const json = await res.json();
                         if (json.status === "success" && json.aggregated_result) {
                             const resData = json.aggregated_result;
+                            let finalSummary = resData.merged_summary || "已成功为您处理并融合相关通知。";
+                            if (totalSum > 0 && !finalSummary.includes('元') && !finalSummary.includes('总计')) {
+                                finalSummary += ` 【系统智能统计：今日关联总支出约 ¥${totalSum.toFixed(2)}】`;
+                            }
                             aggResult.value = { 
                                 title: resData.event_title || "多源通知智能聚合", 
-                                summary: resData.merged_summary || "已成功为您处理并融合相关通知。" 
+                                summary: finalSummary 
                             };
                         } else {
                             alert('聚合请求未返回有效摘要');
