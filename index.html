@@ -54,7 +54,7 @@
                 </nav>
             </div>
             
-            <!-- 侧边栏底部：加入一键恢复测试示例按钮 -->
+            <!-- 侧边栏底部：一键恢复测试示例按钮 -->
             <div class="p-4 border-t border-slate-800 space-y-2">
                 <button @click="refreshSeedData" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
@@ -128,7 +128,7 @@
                         </button>
                     </div>
 
-                    <!-- 底部演示聚合小卡片：完美保留 -->
+                    <!-- 演示聚合小卡片：稳定展示 -->
                     <div v-if="aggResult" class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                         <h4 class="font-bold text-sm text-slate-800 mb-1">📦 {{ aggResult.title }}</h4>
                         <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
@@ -170,7 +170,6 @@
                         </button>
                     </div>
 
-                    <!-- 添加规则面板 -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border">
                         <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 企业微信）" class="p-2 border rounded text-xs">
                         <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 行业资讯）" class="p-2 border rounded text-xs">
@@ -184,7 +183,6 @@
                         </button>
                     </div>
 
-                    <!-- 规则列表 -->
                     <div class="space-y-3">
                         <h4 class="font-bold text-sm text-slate-700">当前生效的自定义策略：</h4>
                         <div v-if="ruleList.length === 0" class="text-xs text-slate-400 py-6 text-center">暂无自定义规则，系统完全由 AI 默认去噪。</div>
@@ -256,7 +254,6 @@
                 const readTabs = ref(new Set());
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
-                // 自定义规则相关状态
                 const ruleList = ref([]);
                 const newRule = ref({ app: '', keyword: '', targetCat: '重要/紧急待办' });
 
@@ -304,7 +301,6 @@
                     finally { fetchingHistory.value = false; }
                 };
 
-                // 获取自定义规则
                 const fetchRules = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/rules');
@@ -380,7 +376,6 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
-                // 一键恢复测试示例函数
                 const refreshSeedData = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/seed/refresh', { method: 'POST' });
@@ -397,7 +392,6 @@
                     }
                 };
 
-                // 使用上一版完美兼容、确保卡片必现的聚合逻辑
                 const runGlobalAggregation = async () => {
                     aggLoading.value = true;
                     aggResult.value = null;
@@ -408,6 +402,7 @@
 
                         if (allItems.length === 0) {
                             alert('当前暂无通知可聚合，请先提交通知或一键恢复测试示例！');
+                            aggLoading.value = false;
                             return;
                         }
 
@@ -418,8 +413,6 @@
                             body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
-                        
-                        // 只要后端返回成功，直接把数据渲染到小卡片上，不再做严苛的字段过滤
                         if (json.status === "success" && json.aggregated_result) {
                             const resData = json.aggregated_result;
                             aggResult.value = { 
@@ -436,7 +429,7 @@
                         setTimeout(() => lucide.createIcons(), 100); 
                     }
                 };
-                
+
                 onMounted(() => {
                     lucide.createIcons();
                     loadSample(1);

@@ -3,10 +3,6 @@ import json
 from openai import OpenAI
 
 def clean_notification_text(raw_notification: str) -> dict:
-    """
-    接收原始通知文本，调用 DeepSeek 大模型进行去噪与结构化提取
-    返回标准的 Python 字典（Dict）
-    """
     client = OpenAI(
         api_key=os.getenv("DEEPSEEK_API_KEY"), 
         base_url="https://api.deepseek.com"
@@ -40,9 +36,7 @@ def clean_notification_text(raw_notification: str) -> dict:
             response_format={ "type": "json_object" },
             stream=False
         )
-        result_str = response.choices[0].message.content
-        return json.loads(result_str)
-
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         return {
             "app_name": "系统提示",
@@ -54,9 +48,6 @@ def clean_notification_text(raw_notification: str) -> dict:
         }
 
 def aggregate_notifications(notification_list: list) -> dict:
-    """
-    接收多条同一事件的原始通知文本列表，进行去重、融合与流式聚合
-    """
     client = OpenAI(
         api_key=os.getenv("DEEPSEEK_API_KEY"), 
         base_url="https://api.deepseek.com"

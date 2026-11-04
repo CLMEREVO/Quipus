@@ -19,41 +19,30 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
         },
     ),
     (
-        "【慕课】单元测验即将截止，注意按时完成。",
+        "【班级群】班长：26号之前交数据结构4、5章作业p70扩展题2 6 7 p115扩展题4 5 8 11 12。",
         {
-            "app_name": "慕课",
+            "app_name": "微信群",
             "category": "重要/紧急待办",
-            "title": "单元测验即将截止",
-            "summary": "单元测验即将截止，请注意按时完成。",
+            "title": "数据结构作业提交",
+            "summary": "26号前交数据结构第四、五章指定扩展题。",
             "is_urgent": True,
-            "event_key": "慕课测验"
+            "event_key": "数据结构作业"
         },
     ),
     (
-        "【晨跑人脸识别】你已在材料院-图书馆方向起点处 刷脸成功。起点刷脸6点35到7点10之间有效。",
+        "【京东】您的领券中心掉落一张满199减100元全场通用券，限时2小时领取。",
         {
-            "app_name": "晨跑打卡",
-            "category": "其他类",
-            "title": "晨跑起点刷脸成功",
-            "summary": "已在材料院起点刷脸成功（多路摄像头已同步）。",
-            "is_urgent": False,
-            "event_key": "晨跑刷脸"
-        },
-    ),
-    (
-        "【淘宝网】淘宝提醒您有四张共655元消费券待领取，属于营销促销。",
-        {
-            "app_name": "淘宝网",
+            "app_name": "京东",
             "category": "无效广告/促销",
-            "title": "淘宝655元消费券待领取",
-            "summary": "淘宝提醒您有四张共655元消费券待领取，属于营销促销。",
+            "title": "满199减100元优惠券",
+            "summary": "全场通用券满199减100，限时领取。",
             "is_urgent": False,
-            "event_key": "淘宝促销"
+            "event_key": "京东促销"
         },
     ),
 ]
 
-_SEED_TIMES = ["08:12", "09:05", "12:03", "15:15"]
+_SEED_TIMES = ["08:12", "09:05", "15:15"]
 
 def _created_ats(n: int) -> list[str]:
     from datetime import datetime
@@ -62,20 +51,15 @@ def _created_ats(n: int) -> list[str]:
 
 def seed_if_empty() -> int:
     storage.init_db()
-    inserted = storage.save_many_if_empty(SEED_ITEMS, _created_ats(len(SEED_ITEMS)))
-    if inserted:
-        logger.info("数据库为空，已预置 %d 条真实场景测试数据", inserted)
-    return inserted
+    return storage.save_many_if_empty(SEED_ITEMS, _created_ats(len(SEED_ITEMS)))
 
 def force_seed_samples() -> int:
-    """主动刷新/重置示例数据，自动检测并跳过已存在的重复内容"""
     storage.init_db()
     existing_items = storage.list_notifications(tab="overview", limit=1000)
     existing_texts = {item["original"] for item in existing_items}
     
     new_items_to_add = []
     new_times = []
-    
     from datetime import datetime
     today = datetime.now().strftime("%Y-%m-%d")
     

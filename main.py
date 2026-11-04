@@ -38,11 +38,7 @@ def _load_captain_functions():
 
 clean_notification_text, aggregate_notifications = _load_captain_functions()
 
-app = FastAPI(
-    title="Quipus Backend",
-    description="智能信息去噪与聚合系统后端 API",
-    version="0.7.0",
-)
+app = FastAPI(title="Quipus Backend", version="0.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,12 +73,7 @@ def clean_one(data: NotificationRequest):
         raise HTTPException(status_code=502, detail=f"大模型解析失败: {exc}") from exc
 
     record = save_notification(data.text, processed_result)
-    return {
-        "status": "success",
-        "raw_text": data.text,
-        "processed_result": processed_result,
-        "id": record["id"],
-    }
+    return {"status": "success", "raw_text": data.text, "processed_result": processed_result, "id": record["id"]}
 
 @app.post("/api/aggregate")
 def aggregate(data: AggregateRequest):
@@ -90,46 +81,24 @@ def aggregate(data: AggregateRequest):
         raise HTTPException(status_code=503, detail="聚合函数不可用")
     try:
         merged = aggregate_notifications(data.notifications)
-        
-        # 容错保护：确保返回的字典里一定有前端需要的字段
         if not isinstance(merged, dict):
             merged = {}
-            
-        event_title = merged.get("event_title") or merged.get("title") or "多源碎片通知智能聚合"
-        merged_summary = merged.get("merged_summary") or merged.get("summary") or "已为您成功提取并融合当前通知消息。"
-        source_apps = merged.get("source_apps") or []
-        
         normalized_result = {
-            "event_title": event_title,
-            "merged_summary": merged_summary,
-            "source_apps": source_apps
+            "event_title": merged.get("event_title") or merged.get("title") or "多源通知智能聚合",
+            "merged_summary": merged.get("merged_summary") or merged.get("summary") or "已成功为您处理并融合相关通知。",
+            "source_apps": merged.get("source_apps") or []
         }
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"聚合失败: {exc}") from exc
 
-    return {
-        "status": "success",
-        "source_count": len(data.notifications),
-        "raw_texts": data.notifications,
-        "aggregated_result": normalized_result,
-    }
+    return {"status": "success", "source_count": len(data.notifications), "aggregated_result": normalized_result}
 
 @app.get("/api/history")
-def get_history(
-    tab: str = Query("overview"),
-    limit: int = Query(200, ge=1, le=1000),
-    q: str | None = Query(None),
-):
+def get_history(tab: str = Query("overview"), limit: int = Query(200, ge=1, le=1000), q: str | None = Query(None)):
     if tab not in TAB_TO_CATEGORY:
-        raise HTTPException(status_code=400, detail=f"tab 非法")
+        raise HTTPException(status_code=400, detail="tab 非法")
     items = list_notifications(tab=tab, limit=limit, keyword=q)
-    return {
-        "status": "success",
-        "tab": tab,
-        "category": TAB_TO_CATEGORY[tab],
-        "count": len(items),
-        "items": items,
-    }
+    return {"status": "success", "tab": tab, "category": TAB_TO_CATEGORY[tab], "count": len(items), "items": items}
 
 @app.get("/api/stats")
 def get_stats():
@@ -137,8 +106,7 @@ def get_stats():
 
 @app.delete("/api/history")
 def delete_history():
-    deleted = clear()
-    return {"status": "success", "deleted": deleted}
+    return {"status": "success", "deleted": clear()}
 
 @app.post("/api/seed/refresh")
 def refresh_seed():
@@ -151,8 +119,7 @@ def list_rules():
 
 @app.post("/api/rules")
 def create_rule(data: RuleRequest):
-    rule_id = add_custom_rule(data.app_keyword, data.text_keyword, data.target_cat)
-    return {"status": "success", "id": rule_id}
+    return {"status": "success", "id": add_custom_rule(data.app_keyword, data.text_keyword, data.target_cat)}
 
 @app.delete("/api/rules/{rule_id}")
 def remove_rule(rule_id: int):
@@ -163,9 +130,3 @@ def remove_rule(rule_id: int):
 def reset_rules():
     reset_custom_rules()
     return {"status": "success", "message": "已恢复默认规则"}
-
-if __name__ == "__main__":
-    import os
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
