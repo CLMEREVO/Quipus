@@ -274,10 +274,27 @@
                     const groups = {};
                     
                     historyList.value.forEach(item => {
-                        const isBlocked = item.data.category === '无效广告/促销' || item.data.category === '拦截类消息';
+                        const cat = item.data.category;
+                        const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
                         
-                        // 如果是拦截类/营销广告，强制将 key 归并为 "已拦截的消息"
-                        const key = isBlocked ? '已拦截的消息' : (item.data.event_key || item.data.title || '通用通知');
+                        // 1. 拦截类消息：统一归并为 "已拦截的消息"
+                        let key = isBlocked ? '已拦截的消息' : (item.data.event_key || item.data.title || '通用通知');
+                        
+                        // 2. 核心优化：将所有支付、消费、充值、账单类的通知（无论金额大小、时间先后），
+                        // 统一在聚合体看板中归并为一张 "今日消费与支付账单" 大卡片，实现类似微信记账报的效果！
+                        const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
+                        const isFinancialPayment = cat === '其他类' && (
+                            textToCheck.includes('支付') || 
+                            textToCheck.includes('付款') || 
+                            textToCheck.includes('充值') || 
+                            textToCheck.includes('元') || 
+                            textToCheck.includes('支出') || 
+                            textToCheck.includes('快捷支付')
+                        );
+                        
+                        if (isFinancialPayment) {
+                            key = '今日消费与支付账单';
+                        }
                         
                         if (!groups[key]) {
                             groups[key] = { 
@@ -290,7 +307,13 @@
                         
                         groups[key].count += 1;
                         
-                        // 时间保持更新为最新一条发生的时间
+                        // 如果是支付账单类，我们可以把摘要优化得更有“记账报”的统计感
+                        if (isFinancialPayment) {
+                            groups[key].lastSummary = `今日已成功聚合 ${groups[key].count} 笔支付与账单通知，已为您实现多源应用统一流水汇总。`;
+                        } else if (!isBlocked) {
+                            groups[key].lastSummary = item.data.summary;
+                        }
+                        
                         if (new Date(item.created_at) > new Date(groups[key].lastTime)) {
                             groups[key].lastTime = item.created_at;
                         }
