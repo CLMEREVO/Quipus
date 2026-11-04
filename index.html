@@ -272,13 +272,30 @@
 
                 const dynamicAggregations = computed(() => {
                     const groups = {};
+                    
                     historyList.value.forEach(item => {
-                        const key = item.data.event_key || item.data.title || '通用通知';
+                        const isBlocked = item.data.category === '无效广告/促销' || item.data.category === '拦截类消息';
+                        
+                        // 如果是拦截类/营销广告，强制将 key 归并为 "已拦截的消息"
+                        const key = isBlocked ? '已拦截的消息' : (item.data.event_key || item.data.title || '通用通知');
+                        
                         if (!groups[key]) {
-                            groups[key] = { key, count: 0, lastSummary: item.data.summary, lastTime: item.created_at };
+                            groups[key] = { 
+                                key: key, 
+                                count: 0, 
+                                lastSummary: isBlocked ? '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。' : item.data.summary, 
+                                lastTime: item.created_at 
+                            };
                         }
+                        
                         groups[key].count += 1;
+                        
+                        // 时间保持更新为最新一条发生的时间
+                        if (new Date(item.created_at) > new Date(groups[key].lastTime)) {
+                            groups[key].lastTime = item.created_at;
+                        }
                     });
+                    
                     return Object.values(groups);
                 });
 
