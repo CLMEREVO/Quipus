@@ -305,30 +305,30 @@
                         
                         groups[key].count += 1;
                         
-                        // 智能正则提取当前通知中的金额（如 50.00元、1000元、¥50 等）
-                        const fullText = item.data.title + " " + item.data.summary + " " + item.original;
-                        const moneyMatches = fullText.match(/(\d+(?:\.\d+)?)\s*(?:元|RMB|￥|\b)/g);
-                        if (moneyMatches) {
-                            moneyMatches.forEach(m => {
-                                const val = parseFloat(m);
-                                if (!isNaN(val) && val < 100000) { // 过滤掉过大的数字防止误判
-                                    groups[key].totalAmount += val;
-                                }
-                            });
+                        // 增强版：智能正则提取当前通知（包括标题、摘要和原始文本）中的各种金额格式（如：68元、20.00、¥50 等）
+                        const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
+                        // 匹配所有带数字的金额模式
+                        const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)/gi;
+                        let match;
+                        let foundInThisItem = false;
+                        while ((match = moneyRegex.exec(fullText)) !== null) {
+                            const val = parseFloat(match[1]);
+                            // 过滤掉年份、时间戳或过大的数字，确保只抓取合理的消费金额
+                            if (!isNaN(val) && val > 0 && val < 50000) {
+                                groups[key].totalAmount += val;
+                                foundInThisItem = true;
+                                break; // 确保每条通知只取一次核心金额，避免重复叠加
+                            }
                         }
                         
                         // 如果是支付账单类，动态生成带有“总消费金额”的记账报摘要
                         if (isFinancialPayment) {
-                            const amountStr = groups[key].totalAmount > 0 ? `，今日累计支出 ¥${groups[key].totalAmount.toFixed(2)}` : '';
-                            groups[key].lastSummary = `今日已成功聚合 ${groups[key].count} 笔支付与账单通知${amountStr}，已实现多源应用统一流水汇总。`;
+                            const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
+                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].count} 笔支付与账单通知，实现多源应用统一流水汇总。`;
                         } else if (isBlocked) {
-                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
+                            groups[key].lastSummary = '来自淘宝,京东,拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
                         } else {
                             groups[key].lastSummary = item.data.summary;
-                        }
-                        
-                        if (new Date(item.created_at) > new Date(groups[key].lastTime)) {
-                            groups[key].lastTime = item.created_at;
                         }
                     });
                     
