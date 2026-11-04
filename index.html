@@ -395,10 +395,21 @@
                 };
 
                 const runGlobalAggregation = async () => {
-                    if (historyList.value.length === 0) { alert('暂无通知可聚合'); return; }
                     aggLoading.value = true;
+                    aggResult.value = null;
                     try {
-                        const realTexts = historyList.value.map(item => item.original);
+                        // 强制拉取全量历史数据（概览标签下的所有通知），确保全局聚合能拿到所有碎片消息
+                        const resAll = await fetch('https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000');
+                        const jsonAll = await resAll.json();
+                        const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
+
+                        if (allItems.length === 0) {
+                            alert('当前没有任何通知记录，请先提交通知或恢复测试示例！');
+                            aggLoading.value = false;
+                            return;
+                        }
+
+                        const realTexts = allItems.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -406,10 +417,19 @@
                         });
                         const json = await res.json();
                         if (json.status === "success") {
-                            aggResult.value = { title: json.aggregated_result.event_title, summary: json.aggregated_result.merged_summary };
+                            aggResult.value = { 
+                                title: json.aggregated_result.event_title, 
+                                summary: json.aggregated_result.merged_summary 
+                            };
+                        } else {
+                            alert('聚合请求返回错误');
                         }
-                    } catch (e) { alert('聚合失败'); }
-                    finally { aggLoading.value = false; setTimeout(() => lucide.createIcons(), 100); }
+                    } catch (e) { 
+                        alert('聚合失败: ' + e.message); 
+                    } finally { 
+                        aggLoading.value = false; 
+                        setTimeout(() => lucide.createIcons(), 100); 
+                    }
                 };
 
                 onMounted(() => {
