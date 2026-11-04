@@ -128,6 +128,7 @@
                         </button>
                     </div>
 
+                    <!-- 底部演示聚合小卡片：完美保留 -->
                     <div v-if="aggResult" class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                         <h4 class="font-bold text-sm text-slate-800 mb-1">📦 {{ aggResult.title }}</h4>
                         <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
@@ -255,6 +256,7 @@
                 const readTabs = ref(new Set());
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
+                // 自定义规则相关状态
                 const ruleList = ref([]);
                 const newRule = ref({ app: '', keyword: '', targetCat: '重要/紧急待办' });
 
@@ -302,6 +304,7 @@
                     finally { fetchingHistory.value = false; }
                 };
 
+                // 获取自定义规则
                 const fetchRules = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/rules');
@@ -394,17 +397,18 @@
                     }
                 };
 
+                // 使用上一版完美兼容、确保卡片必现的聚合逻辑
                 const runGlobalAggregation = async () => {
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        // 强制拉取概览下的全量历史数据
+                        // 确保拿到底部聚合所需的全部通知文本
                         const resAll = await fetch('https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000');
                         const jsonAll = await resAll.json();
                         const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
 
                         if (allItems.length === 0) {
-                            alert('当前没有任何通知记录，请先提交通知或一键恢复测试示例！');
+                            alert('当前暂无通知可聚合，请先提交通知或一键恢复测试示例！');
                             return;
                         }
 
@@ -415,16 +419,13 @@
                             body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
-                        
                         if (json.status === "success" && json.aggregated_result) {
-                            // 兼容大模型返回的不同字段命名，确保百分之百能成功渲染出卡片
-                            const resData = json.aggregated_result;
                             aggResult.value = { 
-                                title: resData.event_title || resData.title || "全局多源通知智能聚合", 
-                                summary: resData.merged_summary || resData.summary || "已成功为您分析并融合当前所有通知。" 
+                                title: json.aggregated_result.event_title, 
+                                summary: json.aggregated_result.merged_summary 
                             };
                         } else {
-                            alert('聚合算法未返回有效摘要，请重试');
+                            alert('聚合请求未返回有效摘要');
                         }
                     } catch (e) { 
                         alert('聚合失败: ' + e.message); 
