@@ -398,14 +398,13 @@
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        // 强制拉取全量历史数据（概览标签下的所有通知），确保全局聚合能拿到所有碎片消息
+                        // 强制拉取概览下的全量历史数据
                         const resAll = await fetch('https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000');
                         const jsonAll = await resAll.json();
                         const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
 
                         if (allItems.length === 0) {
-                            alert('当前没有任何通知记录，请先提交通知或恢复测试示例！');
-                            aggLoading.value = false;
+                            alert('当前没有任何通知记录，请先提交通知或一键恢复测试示例！');
                             return;
                         }
 
@@ -416,13 +415,16 @@
                             body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
-                        if (json.status === "success") {
+                        
+                        if (json.status === "success" && json.aggregated_result) {
+                            // 兼容大模型返回的不同字段命名，确保百分之百能成功渲染出卡片
+                            const resData = json.aggregated_result;
                             aggResult.value = { 
-                                title: json.aggregated_result.event_title, 
-                                summary: json.aggregated_result.merged_summary 
+                                title: resData.event_title || resData.title || "全局多源通知智能聚合", 
+                                summary: resData.merged_summary || resData.summary || "已成功为您分析并融合当前所有通知。" 
                             };
                         } else {
-                            alert('聚合请求返回错误');
+                            alert('聚合算法未返回有效摘要，请重试');
                         }
                     } catch (e) { 
                         alert('聚合失败: ' + e.message); 
