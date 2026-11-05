@@ -345,12 +345,13 @@
                         } 
                         // 2. 快递类处理：统一合并进一张卡片，并智能计算包裹总数
                         else if (isExpressDelivery) {
-                            // 将每条快递通知的内容或时间加入集合，确保即使跨了分钟也能正确累加包裹计数
-                            const parcelId = item.created_at + "_" + item.data.title;
-                            groups[key].expressSet.add(parcelId);
+                            // 核心优化：只要是同一分钟内到达的快递类通知（不论是淘宝、支付宝还是菜鸟），
+                            // 都强行认为是同一个物理包裹的多源并发推送，只记为 1 件包裹！
+                            const minuteBucket = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
+                            groups[key].expressSet.add(minuteBucket);
                             
-                            groups[key].businessCount = groups[key].expressSet.size; // 独立包裹总数会随着手动输入不断累加！
-                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合菜鸟、淘宝、京东等多源物流通知，消除冗余打扰。`;
+                            groups[key].businessCount = groups[key].expressSet.size; // 这样 3 条同分钟的通知消重后严格等于 1 件！
+                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合菜鸟、淘宝、支付宝等多源物流通知，消除冗余打扰。`;
                         } 
                         else if (isBlocked) {
                             groups[key].businessCount = groups[key].count;

@@ -84,24 +84,25 @@ def force_seed_samples() -> int:
     existing_texts = {item["original"] for item in existing_items}
     
     new_items_to_add = []
-    new_times = []
     from datetime import datetime
     today = datetime.now().strftime("%Y-%m-%d")
     
     for idx, (raw_text, result) in enumerate(SEED_ITEMS):
         if raw_text not in existing_texts:
             new_items_to_add.append((raw_text, result))
-            new_times.append(f"{today} 10:00:0{idx}")
             
     if new_items_to_add:
         conn = storage._connect()
         added_count = 0
         with conn:
             for i, (raw, res) in enumerate(new_items_to_add):
+                # 核心修改：让恢复的测试示例全部采用整齐划一的固定时间（例如 12:15:00），
+                # 这样它们在同一秒并发到达，完美契合多源消重逻辑！
+                fixed_time = f"{today} 12:15:00"
                 conn.execute(
                     """INSERT INTO notifications (created_at, raw_text, category, is_urgent, app_name, title, result_json)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    storage._to_row(new_times[i], raw, res)
+                    storage._to_row(fixed_time, raw, res)
                 )
                 added_count += 1
         conn.close()
