@@ -503,10 +503,19 @@
                             return;
                         }
 
-                        // 前端本地对金额做统计算法
+                        // 前端本地对真实消费金额做统计算法（严格过滤掉拦截类、优惠券促销通知）
                         let totalSum = 0;
                         allItems.forEach(item => {
+                            const cat = item.data.category;
+                            const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
+                            const lowerText = fullText.toLowerCase();
+
+                            // 如果是拦截类消息，或者文本中包含优惠券、促销、领取等营销字眼，直接跳过，不计入真实支出
+                            if (isBlocked || lowerText.includes('优惠券') || lowerText.includes('消费券') || lowerText.includes('满减') || lowerText.includes('领取') || lowerText.includes('白条额度') || lowerText.includes('降价')) {
+                                return;
+                            }
+
                             const matches = fullText.match(/(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g);
                             if (matches) {
                                 matches.forEach(m => {
