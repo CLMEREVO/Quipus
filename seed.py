@@ -8,15 +8,27 @@ logger = logging.getLogger("quipus.seed")
 
 # 让多源并发的通知共享同一个精确时间戳，模拟秒级同时送达
 SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
+    # 下面两条支付通知属于【同一时刻】多源并发到达
     (
-        "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知，请同学们提前做好储水准备。",
+        "【招商银行】您尾号1234的银行卡已成功支付11.90元。",
         {
-            "app_name": "教务处",
-            "category": "重要/紧急待办",
-            "title": "全校停水检修紧急通知",
-            "summary": "本周五下午全校停水检修，请提前储水.",
-            "is_urgent": True,
-            "event_key": "全校停水"
+            "app_name": "招商银行",
+            "category": "其他类",
+            "title": "支付成功",
+            "summary": "已用银行卡支付11.90.",
+            "is_urgent": False,
+            "event_key": "支付提醒"
+        },
+    ),
+    (
+        "【微信支付】您已成功支付11.90元。",
+        {
+            "app_name": "微信支付",
+            "category": "其他类",
+            "title": "支付成功",
+            "summary": "已支付11.90.",
+            "is_urgent": False,
+            "event_key": "支付提醒"
         },
     ),
     # 以下三条快递通知属于【同一时刻】多源并发到达
@@ -55,7 +67,7 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
     ),
 ]
 
-_SEED_TIMES = ["12:15", "12:15", "12:15"]
+_SEED_TIMES = ["7:20", "7:20", "12:15", "12:15", "12:15"]
 
 def _created_ats(n: int) -> list[str]:
     from datetime import datetime
