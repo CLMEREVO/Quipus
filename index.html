@@ -298,11 +298,10 @@
                             textToCheck.includes('派送')
                         );
                         
-                        // 统一归类
                         if (isFinancialPayment) {
                             key = '今日消费与支付账单';
                         } else if (isExpressDelivery) {
-                            key = '待取快递与物流动态'; // 保持唯一的快递看板卡片
+                            key = '待取快递与物流动态';
                         }
                         
                         if (!groups[key]) {
@@ -312,15 +311,23 @@
                                 businessCount: 0, 
                                 totalAmount: 0, 
                                 seenAmounts: new Set(), 
-                                expressSet: new Set(), // 用于收集所有独立的快递到达时间或标题
-                                lastSummary: '', 
+                                expressSet: new Set(), 
+                                lastSummary: item.data.summary, 
                                 lastTime: item.created_at 
                             };
                         }
                         
                         groups[key].count += 1;
                         
-                        // 1. 支付类处理（保持去重和总金额计算）
+                        // 维护组内最新时间与最新摘要（确保作业动态覆盖生效）
+                        if (!groups[key].lastTime || new Date(item.created_at) >= new Date(groups[key].lastTime)) {
+                            groups[key].lastTime = item.created_at;
+                            if (!isFinancialPayment && !isExpressDelivery && !isBlocked) {
+                                groups[key].lastSummary = item.data.summary; // 采用最新一条通知的摘要
+                            }
+                        }
+                        
+                        // 1. 支付类处理
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)/gi;
@@ -343,40 +350,23 @@
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
                             groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源重复推送），实现全渠道流水汇总。`;
                         } 
-                        // 2. 快递类处理：统一合并进一张卡片，并智能计算包裹总数
+                        // 2. 快递类处理：统一合并进一张卡片，并基于分钟批次强制消重（不论淘宝、支付宝还是菜鸟，同分钟到达即为同一批包裹）
                         else if (isExpressDelivery) {
-                            // 核心优化：只要是同一分钟内到达的快递类通知（不论是淘宝、支付宝还是菜鸟），
-                            // 都强行认为是同一个物理包裹的多源并发推送，只记为 1 件包裹！
-                            const minuteBucket = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
-                            groups[key].expressSet.add(minuteBucket);
+                            // 核心修改：只用分钟时间桶作为唯一标识，忽略标题差异，确保同时刻的多源推送严格消重为 1
+                            const batchId = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
+                            groups[key].expressSet.add(batchId);
                             
-                            groups[key].businessCount = groups[key].expressSet.size; // 这样 3 条同分钟的通知消重后严格等于 1 件！
+                            groups[key].businessCount = groups[key].expressSet.size; // 这样同分钟的多源消息消重后严格等于 1！
                             groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合菜鸟、淘宝、支付宝等多源物流通知，消除冗余打扰。`;
-                        } 
-                        // 3. 其他普通聚合事件（如作业、停水等）
-                        else {
-                            groups[key].businessCount = groups[key].count;
-                            // 关键：确保摘要和发生时间始终同步为该组内最新（最后到达）的那一条通知
-                            groups[key].lastSummary = item.data.summary;
                         }
-                        
-                        // 统一维护最新发生时间为当前组内所有通知的最大时间
-                        if (!groups[key].lastTime || new Date(item.created_at) > new Date(groups[key].lastTime)) {
-                            groups[key].lastTime = item.created_at;
-                            if (!isFinancialPayment && !isExpressDelivery && !isBlocked) {
-                                groups[key].lastSummary = item.data.summary; // 强制使用最新一条的摘要
-                            }
-                        }
+                        // 3. 拦截类处理
                         else if (isBlocked) {
                             groups[key].businessCount = groups[key].count;
-                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
-                        } else {
+                            groups[key].lastSummary = '来自淘宝、京东、普惠等平台的促销优惠与营销通知，已为您自动折叠拦截。';
+                        } 
+                        // 4. 其他常规类（作业、停水等）
+                        else {
                             groups[key].businessCount = groups[key].count;
-                            groups[key].lastSummary = item.data.summary;
-                        }
-                        
-                        if (new Date(item.created_at) > new Date(groups[key].lastTime)) {
-                            groups[key].lastTime = item.created_at;
                         }
                     });
                     
