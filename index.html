@@ -356,10 +356,10 @@
                             const batchId = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
                             groups[key].expressSet.add(batchId);
                             groups[key].businessCount = groups[key].expressSet.size;
-                            // 锁死快递卡片的专业统计文案，绝不被单条消息覆盖
-                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].expressCount} 件】 已自动聚合菜鸟、淘宝、支付宝等多源物流通知，消除冗余打扰。`;
+                            // 使用正确的 businessCount 变量展示包裹总数
+                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合多源物流通知。`;
                             groups[key].lastTime = item.created_at;
-                        } 
+                        }
                         // 3. 拦截类处理
                         else if (isBlocked) {
                             groups[key].businessCount = groups[key].count;
