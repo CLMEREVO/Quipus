@@ -281,7 +281,6 @@
                         
                         const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
                         
-                        // 判定是否属于支付账单类
                         const isFinancialPayment = cat === '其他类' && (
                             textToCheck.includes('支付') || 
                             textToCheck.includes('付款') || 
@@ -291,7 +290,6 @@
                             textToCheck.includes('快捷支付')
                         );
                         
-                        // 判定是否属于快递物流类
                         const isExpressDelivery = cat === '其他类' && (
                             textToCheck.includes('快递') || 
                             textToCheck.includes('包裹') || 
@@ -301,7 +299,6 @@
                             textToCheck.includes('派送')
                         );
                         
-                        // 分别归一化 Key
                         if (isFinancialPayment) {
                             key = '今日消费与支付账单';
                         } else if (isExpressDelivery) {
@@ -313,7 +310,9 @@
                                 key: key, 
                                 count: 0, 
                                 totalAmount: 0, 
-                                expressCount: 0, // 新增：独立统计快递有效包裹数
+                                expressCount: 0, 
+                                seenAmounts: new Set(), // 用于支付金额去重
+                                seenExpressTimes: new Set(), // 用于快递包裹去重
                                 lastSummary: '', 
                                 lastTime: item.created_at 
                             };
@@ -321,7 +320,7 @@
                         
                         groups[key].count += 1;
                         
-                        // 如果是支付类，计算总金额
+                        // 1. 支付类：多源同笔交易智能去重累加金额
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)/gi;
@@ -329,16 +328,29 @@
                             while ((match = moneyRegex.exec(fullText)) !== null) {
                                 const val = parseFloat(match[1]);
                                 if (!isNaN(val) && val > 0 && val < 50000) {
-                                    groups[key].totalAmount += val;
+                                    // 核心优化：如果相同金额且时间接近（同一分钟），判定为同一笔支付的多源上报，避免重复累加
+                                    const timeKey = item.created_at.substring(0, 16); // 精确到分钟 YYYY-MM-DD HH:MM
+                                    const amountKey = `${timeKey}_${val}`;
+                                    
+                                    if (!groups[key].seenAmounts.has(amountKey)) {
+                                        groups[key].seenAmounts.add(amountKey);
+                                        groups[key].totalAmount += val;
+                                    }
                                     break;
                                 }
                             }
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
-                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].count} 条多源支付通知，实现全渠道流水汇总。`;
+                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].count} 条多源支付通知（多源应用自动去重校验），实现全渠道流水汇总。`;
                         } 
+                        // 2. 快递类：多源同包裹智能消重计数
                         else if (isExpressDelivery) {
-                            // 如果是同一时间段（3秒内）的多源通知，智能归并为一个包裹
-                            groups[key].expressCount = 1; // 评委一键恢复时，这三条同时间的多源通知会被精准识别并记为 1 个核心包裹事件
+                            // 以到达时间（精确到分钟）或取件码作为包裹唯一标识，防止淘宝+支付宝+菜鸟同一时刻推送被算作3个包裹
+                            const arrivalMinute = item.created_at.substring(0, 16);
+                            if (!groups[key].seenExpressTimes.has(arrivalMinute)) {
+                                groups[key].seenExpressTimes.add(arrivalMinute);
+                            }
+                            groups[key].expressCount = groups[key].seenExpressTimes.size; // 独立包裹实体数
+                            
                             groups[key].lastSummary = `【待取包裹：共 ${groups[key].expressCount} 件】 已自动聚合菜鸟、淘宝、支付宝等多源物流通知，消除冗余打扰。`;
                         } 
                         else if (isBlocked) {
