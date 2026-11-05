@@ -356,7 +356,7 @@
                             const batchId = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
                             groups[key].expressSet.add(batchId);
                             groups[key].businessCount = groups[key].expressSet.size;
-                            // 使用正确的 businessCount 变量展示包裹总数
+                            // 确保此处使用的是正确的 businessCount 变量，杜绝 undefined
                             groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合多源物流通知。`;
                             groups[key].lastTime = item.created_at;
                         }
