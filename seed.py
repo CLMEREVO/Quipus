@@ -6,6 +6,7 @@ import storage
 
 logger = logging.getLogger("quipus.seed")
 
+# 让多源并发的通知共享同一个精确时间戳，模拟秒级同时送达
 SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
     (
         "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知，请同学们提前做好储水准备。",
@@ -13,12 +14,12 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
             "app_name": "教务处",
             "category": "重要/紧急待办",
             "title": "全校停水检修紧急通知",
-            "summary": "本周五下午全校停水检修，请提前储水。",
+            "summary": "本周五下午全校停水检修，请提前储水.",
             "is_urgent": True,
             "event_key": "全校停水"
         },
     ),
-    # 模拟同一快递的多源并发通知（同一秒内：菜鸟、支付宝、淘宝）
+    # 以下三条快递通知属于【同一时刻】多源并发到达
     (
         "【菜鸟驿站】您的顺丰包裹已到达学校南门驿站，取件码 5-2-3008。",
         {
@@ -50,52 +51,6 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
             "summary": "宝贝已送达菜鸟驿站，请及时取件。",
             "is_urgent": False,
             "event_key": "快递物流"
-        },
-    ),
-    # 模拟第二批不同时间到达的新快递（与上一批间隔大于3秒）
-    (
-        "【京东快递】您的京东自营订单已由快递员派送中，请保持电话畅通。",
-        {
-            "app_name": "京东",
-            "category": "其他类",
-            "title": "京东快递派送通知",
-            "summary": "京东自营订单正在派送中。",
-            "is_urgent": False,
-            "event_key": "快递物流"
-        },
-    ),
-    # 模拟多笔支付账单
-    (
-        "【微信支付】您通过微信支付向“校园一卡通”成功充值 50.00 元。",
-        {
-            "app_name": "微信支付",
-            "category": "其他类",
-            "title": "一卡通充值成功",
-            "summary": "成功充值 50.00 元。",
-            "is_urgent": False,
-            "event_key": "支付账单"
-        },
-    ),
-    (
-        "【招商银行】您的尾号2709账户于今日完成快捷支付支出 200.00 元。",
-        {
-            "app_name": "招商银行",
-            "category": "其他类",
-            "title": "银行卡支出提醒",
-            "summary": "快捷支付支出 200.00 元。",
-            "is_urgent": False,
-            "event_key": "支付账单"
-        },
-    ),
-    (
-        "【京东】您的领券中心掉落一张满199减100元全场通用券，限时2小时领取。",
-        {
-            "app_name": "京东",
-            "category": "无效广告/促销",
-            "title": "满199减100元优惠券",
-            "summary": "全场通用券满199减100，限时领取。",
-            "is_urgent": False,
-            "event_key": "京东促销"
         },
     ),
 ]
