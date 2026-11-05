@@ -55,7 +55,7 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
     ),
 ]
 
-_SEED_TIMES = ["08:12", "09:05", "15:15"]
+_SEED_TIMES = ["12:15", "12:15", "12:15"]
 
 def _created_ats(n: int) -> list[str]:
     from datetime import datetime
