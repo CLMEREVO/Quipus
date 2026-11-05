@@ -301,14 +301,19 @@
                         if (isFinancialPayment) {
                             key = '今日消费与支付账单';
                         } else if (isExpressDelivery) {
-                            key = '待取快递与物流动态';
+                            // 核心优化：为了让不同时间（间隔超过几秒）输入的快递通知能被识别为不同包裹批次，
+                            // 我们可以把到达的“分钟级时间戳”（YYYY-MM-DD HH:MM）融入 Key 中！
+                            // 这样同一分钟内的多源并发（如淘宝+支付宝同秒）会自动合并，而不同分钟输入的快递会生成独立的快递卡片批次！
+                            const minuteBucket = item.created_at ? item.created_at.substring(0, 16) : 'other';
+                            key = `待取快递与物流动态_${minuteBucket}`;
                         }
                         
                         if (!groups[key]) {
                             groups[key] = { 
-                                key: key, 
-                                count: 0,           // 原始消息计数
-                                businessCount: 0,   // 核心业务事件净计数（用于右上角标签展示）
+                                key: isExpressDelivery ? '待取快递与物流动态' : key, 
+                                batchKey: key,
+                                count: 0, 
+                                businessCount: 0, 
                                 totalAmount: 0, 
                                 seenAmounts: new Set(), 
                                 seenExpressTimes: new Set(), 
@@ -319,7 +324,7 @@
                         
                         groups[key].count += 1;
                         
-                        // 1. 支付类：多源同笔交易智能去重
+                        // 1. 支付类处理保持不变（同笔去重）
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)/gi;
@@ -332,36 +337,24 @@
                                     break;
                                 }
                             }
-                            
-                            // 用金额+分钟作为唯一交易签名去重
                             const timeKey = item.created_at.substring(0, 16);
                             const txnSignature = `${timeKey}_${currentVal}`;
-                            
                             if (currentVal > 0 && !groups[key].seenAmounts.has(txnSignature)) {
                                 groups[key].seenAmounts.add(txnSignature);
                                 groups[key].totalAmount += currentVal;
                             }
-                            
-                            // 业务笔数 = 去重后的独立交易数
                             groups[key].businessCount = groups[key].seenAmounts.size;
-                            
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
                             groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源重复推送），实现全渠道流水汇总。`;
                         } 
-                        // 2. 快递类：多源同包裹消重
+                        // 2. 快递类处理：同批次消重，不同批次独立成卡片
                         else if (isExpressDelivery) {
-                            // 以到达分钟作为包裹批次标识
-                            const arrivalMinute = item.created_at.substring(0, 16);
-                            if (!groups[key].seenExpressTimes.has(arrivalMinute)) {
-                                groups[key].seenExpressTimes.add(arrivalMinute);
-                            }
-                            groups[key].businessCount = groups[key].seenExpressTimes.size; // 实际独立包裹数
-                            
-                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合菜鸟、淘宝、支付宝等多源物流通知，消除冗余打扰。`;
+                            groups[key].businessCount = 1; // 每个时间批次代表独立的一批包裹事件
+                            groups[key].lastSummary = `【待取包裹：本批次共 1 件】 已自动聚合该时段的多源物流通知，消除冗余打扰。`;
                         } 
                         else if (isBlocked) {
                             groups[key].businessCount = groups[key].count;
-                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知,已为您自动折叠拦截。';
+                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
                         } else {
                             groups[key].businessCount = groups[key].count;
                             groups[key].lastSummary = item.data.summary;
