@@ -219,16 +219,22 @@
                                 <div class="flex items-center space-x-2">
                                     <span class="font-bold text-sm bg-slate-900 text-white px-2.5 py-0.5 rounded">{{ item.data.app_name }}</span>
                                     <span class="text-xs px-2 py-0.5 rounded font-medium"
-                                          :class="{
-                                              'bg-amber-100 text-amber-800': item.data.category === '重要/紧急待办',
-                                              'bg-blue-100 text-blue-800': item.data.category === '其他类' || item.data.category === '物流与消费',
-                                              'bg-rose-100 text-rose-800': item.data.category === '无效广告/促销'
-                                          }">
+                                        :class="{
+                                            'bg-amber-100 text-amber-800': item.data.category === '重要/紧急待办',
+                                            'bg-blue-100 text-blue-800': item.data.category === '其他类' || item.data.category === '物流与消费',
+                                            'bg-rose-100 text-rose-800': item.data.category === '无效广告/促销'
+                                        }">
                                         {{ item.data.category }}
                                     </span>
                                     <span v-if="item.data.is_urgent" class="bg-rose-600 text-white text-xs px-2 py-0.5 rounded-full font-bold animate-pulse">🔥 紧急置顶</span>
                                 </div>
-                                <span class="text-xs text-slate-400">{{ item.created_at }}</span>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-xs text-slate-400">{{ item.created_at }}</span>
+                                    <!-- 新增：独立删除按钮 -->
+                                    <button @click="deleteNotification(item.id)" title="删除此条通知" class="text-slate-400 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50">
+                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
                             </div>
                             <h4 class="text-base font-bold text-slate-900 mb-1">{{ item.data.title }}</h4>
                             <p class="text-sm text-slate-600 mb-3 bg-white/60 p-2.5 rounded border border-slate-100">摘要：{{ item.data.summary }}</p>
@@ -505,6 +511,30 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
+                const deleteNotification = async (id) => {
+                    if (!id) {
+                        alert('通知 ID 无效');
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${id}`, {
+                            method: 'DELETE'
+                        });
+                        const json = await res.json();
+                        if (res.ok || json.status === 'success') {
+                            // 本地立刻过滤掉已删除项，保持界面极速响应
+                            historyList.value = historyList.value.filter(item => item.id !== id);
+                            await fetchStats();
+                        } else {
+                            alert('删除失败: ' + (json.message || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('删除请求异常: ' + e.message);
+                    } finally {
+                        setTimeout(() => lucide.createIcons(), 100);
+                    }
+                };
+
                 const refreshSeedData = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/seed/refresh', { method: 'POST' });
@@ -641,7 +671,7 @@
 
                 return {
                     currentTab, inputText, loading, fetchingHistory, historyList, stats, aggResult, readTabs, dynamicAggregations,
-                    ruleList, newRule, addRule, deleteRule, resetRules, refreshSeedData,
+                    ruleList, newRule, addRule, deleteRule, resetRules, refreshSeedData, deleteNotification, // <--- 加上这一项
                     loadSample, getTabTitle, submitNotification, clearHistory, runGlobalAggregation, aggLoading
                 };
             }
