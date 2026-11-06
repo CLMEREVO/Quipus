@@ -566,7 +566,7 @@
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ notifications: realTexts })
+                            body: JSON.stringify({ texts: realTexts }) 
                         });
                         const json = await res.json();
                         
