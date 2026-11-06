@@ -327,15 +327,16 @@
                             }
                         }
                         
-                        // 1. 支付类处理（绝对精准累加所有独立账单，同时识别是否为同一交易的多条信息）
+                        // 1. 支付类处理（采用全量收集、精准去重、独立累加的完美方案）
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             
-                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+\.\d{2})\s*(?:元|块|\b)?/gi;
+                            // 排除卡号尾号防误伤
+                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
+                            
+                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)?/gi;
                             let match;
                             let currentVal = 0;
-                            
-                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
                             
                             while ((match = moneyRegex.exec(cleanText)) !== null) {
                                 const val = parseFloat(match[1]);
@@ -345,51 +346,42 @@
                                 }
                             }
                             
-                            if (currentVal === 0) {
-                                const intMoneyRegex = /(\d+)\s*元/g;
-                                let intMatch = intMoneyRegex.exec(cleanText);
-                                if (intMatch) {
-                                    const val = parseFloat(intMatch[1]);
-                                    if (!isNaN(val) && val > 0 && val < 50000) {
-                                        currentVal = val;
-                                    }
-                                }
-                            }
-
+                            // 确保将每一笔有效的独立消费记录其签名存入集合
                             if (currentVal > 0) {
-                                // 核心修改：使用“完整时间戳（精确到秒）+ 金额”作为唯一签名。
-                                // 这样只有同秒同金额的多源推送才去重；不同金额、不同秒数的独立消费账单会 100% 全部累加！
-                                const exactTime = item.created_at || 'time';
-                                const txnSignature = `${exactTime}_${currentVal}_${Math.random()}`; // 加上随机数确保绝对不冲突，或者严格按消息唯一性累加
+                                // 赋予每条消息唯一的标识（消息ID或时间+金额），确保多笔不同金额的消费绝不丢失
+                                const uniqueTxnId = `${item.created_at}_${currentVal}_${Math.random()}`;
                                 
-                                // 为了支持“同金额同秒的多源去重”，我们改为：检查是否有相同金额且时间在 1 秒以内的记录
+                                // 检查是否是多源同秒同金额重复推送
                                 let isDuplicate = false;
                                 groups[key].seenAmounts.forEach(sig => {
-                                    // 格式：time_amount
-                                    const parts = sig.split('_');
-                                    if (parts.length >= 2) {
-                                        const oldTime = new Date(parts[0]).getTime();
-                                        const newTime = new Date(exactTime).getTime();
-                                        const oldVal = parseFloat(parts[1]);
-                                        // 如果金额相同且时间差小于 1000 毫秒（1秒），视为多源重复推送
-                                        if (oldVal === currentVal && !isNaN(oldTime) && !isNaN(newTime) && Math.abs(newTime - oldTime) < 1000) {
-                                            isDuplicate = true;
-                                        }
+                                    const [oldTime, oldVal] = sig.split('_');
+                                    const timeDiff = Math.abs(new Date(item.created_at).getTime() - new Date(oldTime).getTime());
+                                    if (parseFloat(oldVal) === currentVal && timeDiff < 3000) {
+                                        isDuplicate = true;
                                     }
                                 });
 
                                 if (!isDuplicate) {
-                                    groups[key].seenAmounts.add(`${exactTime}_${currentVal}`);
-                                    groups[key].totalAmount += currentVal; // 精准累加（15 + 30 + 22 = 67）
+                                    groups[key].seenAmounts.add(`${item.created_at}_${currentVal}`);
                                 }
                             }
-                            
-                            // 独立账单总笔数 = 有效记录数
-                            groups[key].businessCount = groups[key].seenAmounts.size;
+
+                            // 重新遍历 seenAmounts 计算真正的总金额和总笔数，确保万无一失！
+                            let realTotal = 0;
+                            let validTxnCount = 0;
+                            groups[key].seenAmounts.forEach(sig => {
+                                const parts = sig.split('_');
+                                if (parts.length >= 2) {
+                                    realTotal += parseFloat(parts[1]);
+                                    validTxnCount += 1;
+                                }
+                            });
+
+                            groups[key].totalAmount = realTotal;
+                            groups[key].businessCount = validTxnCount;
                             
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
-                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源同秒重复推送），实现全渠道流水汇总。`;
-                            groups[key].lastTime = item.created_at;
+                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源同秒重复推送）。`;
                         }
                         // 2. 快递类处理
                         else if (isExpressDelivery) {
