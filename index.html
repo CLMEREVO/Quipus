@@ -535,26 +535,38 @@
                             return;
                         }
 
-                        // 1. 前端本地对真实消费金额做统计算法
+                        // 前端本地对真实消费金额做统计算法（引入消费签名去重机制，杜绝重复累加！）
                         let totalSum = 0;
+                        const seenTxns = new Set();
+                        
                         allItems.forEach(item => {
                             const cat = item.data.category;
                             const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const lowerText = fullText.toLowerCase();
 
+                            // 排除拦截类、营销券、卡号尾号
                             if (isBlocked || lowerText.includes('优惠券') || lowerText.includes('消费券') || lowerText.includes('满减') || lowerText.includes('领取') || lowerText.includes('白条额度') || lowerText.includes('降价')) {
                                 return;
                             }
 
                             let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
+
+                            // 匹配有效金额
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g;
                             let match;
                             while ((match = moneyRegex.exec(cleanText)) !== null) {
                                 const v = parseFloat(match[1]);
                                 if (!isNaN(v) && v > 0 && v < 100000) {
-                                    totalSum += v;
-                                    break;
+                                    // 核心去重：通过“金额 + 模糊时间（精确到分钟）”生成唯一签名，防止默认示例中多源或重复数据被加两次
+                                    const timeMinute = item.created_at ? item.created_at.substring(0, 16) : 'time';
+                                    const txnSig = `${timeMinute}_${v}`;
+                                    
+                                    if (!seenTxns.has(txnSig)) {
+                                        seenTxns.add(txnSig);
+                                        totalSum += v;
+                                    }
+                                    break; 
                                 }
                             }
                         });
