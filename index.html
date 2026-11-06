@@ -327,16 +327,14 @@
                             }
                         }
                         
-                        // 1. 支付类处理（带防错与防尾号误伤的精准金额提取）
+                        // 1. 支付类处理（精确累加所有独立账单，仅对“同金额+同时间”的多源并发进行去重）
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             
-                            // 严谨的支付金额正则：匹配带有“元/￥/RMB”或带有小数点的有效金额，同时排除“尾号/卡号”后面的数字
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+\.\d{2})\s*(?:元|块|\b)?/gi;
                             let match;
                             let currentVal = 0;
                             
-                            // 先检查文本中是否包含“尾号XXXX”，避免把卡号误认为金额
                             let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
                             
                             while ((match = moneyRegex.exec(cleanText)) !== null) {
@@ -347,7 +345,6 @@
                                 }
                             }
                             
-                            // 如果上面没抓到带小数点的，再尝试抓取带“元”字的整数
                             if (currentVal === 0) {
                                 const intMoneyRegex = /(\d+)\s*元/g;
                                 let intMatch = intMoneyRegex.exec(cleanText);
@@ -359,15 +356,22 @@
                                 }
                             }
 
-                            const timeKey = item.created_at.substring(0, 16);
-                            const txnSignature = `${timeKey}_${currentVal}`;
-                            if (currentVal > 0 && !groups[key].seenAmounts.has(txnSignature)) {
-                                groups[key].seenAmounts.add(txnSignature);
-                                groups[key].totalAmount += currentVal;
+                            if (currentVal > 0) {
+                                // 核心修改：签名加入金额，确保只有“同金额且同时间”的多源推送才去重；不同金额的独立消费全部累加！
+                                const timeKey = item.created_at ? item.created_at.substring(0, 16) : 'time';
+                                const txnSignature = `${timeKey}_${currentVal}`;
+                                
+                                if (!groups[key].seenAmounts.has(txnSignature)) {
+                                    groups[key].seenAmounts.add(txnSignature);
+                                    groups[key].totalAmount += currentVal; // 累加真实总额（30 + 22 + 19 = 71）
+                                }
                             }
+                            
+                            // 独立账单总笔数 = 收集到的所有有效消费签名数
                             groups[key].businessCount = groups[key].seenAmounts.size;
+                            
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
-                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源重复推送），实现全渠道流水汇总。`;
+                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（多源同笔自动去重，异笔正常累加），实现全渠道流水汇总。`;
                             groups[key].lastTime = item.created_at;
                         }
                         // 2. 快递类处理
