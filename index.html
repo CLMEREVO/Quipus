@@ -573,8 +573,7 @@
                             const resData = json.aggregated_result;
                             let finalSummary = resData.merged_summary || "已成功为您处理并融合相关通知。";
                             
-                            // 核心优化：如果大模型返回的摘要中同时包含了“26号”和“周五”，说明存在时间覆盖变更，
-                            // 我们在这里进行智能文案收敛，让其统一呈现最新的“周五前交”，避免产生“两次作业”的歧义！
+                            // 1. 保留昨天的核心优化：处理作业通知中“26号”与“周五”的时间覆盖文案收敛，避免产生“两次作业”的歧义
                             if (finalSummary.includes('26号') && (finalSummary.includes('周五') || finalSummary.includes('星期五'))) {
                                 finalSummary = finalSummary.replace(/并提醒26号之前交第[^，,\n]*[，,\n]*/g, '');
                                 finalSummary = finalSummary.replace(/26号[^，,\n]*交[^，,\n]*[，,\n]*/g, '');
@@ -583,9 +582,16 @@
                                 }
                             }
 
-                            if (totalSum > 0 && !finalSummary.includes('元') && !finalSummary.includes('总计')) {
-                                finalSummary += ` 【系统智能统计：今日关联总支出约 ¥${totalSum.toFixed(2)}】`;
+                            // 2. 兼容性优化：修正“同时”等容易产生歧义的表述
+                            finalSummary = finalSummary.replace(/同时/g, '先后');
+
+                            // 3. 完美兼容金额追加：只要计算出了 totalSum > 0，就强制且精准地追加总消费统计，绝不被摘要里的“元”字拦截！
+                            if (totalSum > 0) {
+                                // 清除可能重复出现的旧金额描述
+                                finalSummary = finalSummary.replace(/合计[\d\.]+元[，,]?/g, '');
+                                finalSummary += ` 【今日累计支出：¥${totalSum.toFixed(2)}】`;
                             }
+
                             aggResult.value = { 
                                 title: resData.event_title || "多源通知智能聚合", 
                                 summary: finalSummary 
