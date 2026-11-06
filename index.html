@@ -562,12 +562,14 @@
                             }
                         });
 
+                        const realTexts = allItems.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ notifications: realTexts })
                         });
                         const json = await res.json();
+                        
                         if (json.status === "success" && json.aggregated_result) {
                             const resData = json.aggregated_result;
                             let finalSummary = resData.merged_summary || "已成功为您处理并融合相关通知。";
@@ -583,7 +585,7 @@
 
                             finalSummary = finalSummary.replace(/同时/g, '先后');
 
-                            // 关键清理：先抹掉大模型摘要里自带的所有带“元”的金额字眼，防止与前端精确计算的总额冲突或被二次累加
+                            // 关键清理：先抹掉大模型摘要里自带的所有带“元”的金额字眼，防止重复累加
                             finalSummary = finalSummary.replace(/共?[\d\.]+元/g, '').replace(/合计[\d\.]+元/g, '');
 
                             // 强制精准拼接前端算出来的总消费金额
