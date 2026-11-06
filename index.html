@@ -327,19 +327,38 @@
                             }
                         }
                         
-                        // 1. 支付类处理
+                        // 1. 支付类处理（带防错与防尾号误伤的精准金额提取）
                         if (isFinancialPayment) {
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
-                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)/gi;
+                            
+                            // 严谨的支付金额正则：匹配带有“元/￥/RMB”或带有小数点的有效金额，同时排除“尾号/卡号”后面的数字
+                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+\.\d{2})\s*(?:元|块|\b)?/gi;
                             let match;
                             let currentVal = 0;
-                            while ((match = moneyRegex.exec(fullText)) !== null) {
+                            
+                            // 先检查文本中是否包含“尾号XXXX”，避免把卡号误认为金额
+                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
+                            
+                            while ((match = moneyRegex.exec(cleanText)) !== null) {
                                 const val = parseFloat(match[1]);
                                 if (!isNaN(val) && val > 0 && val < 50000) {
                                     currentVal = val;
                                     break;
                                 }
                             }
+                            
+                            // 如果上面没抓到带小数点的，再尝试抓取带“元”字的整数
+                            if (currentVal === 0) {
+                                const intMoneyRegex = /(\d+)\s*元/g;
+                                let intMatch = intMoneyRegex.exec(cleanText);
+                                if (intMatch) {
+                                    const val = parseFloat(intMatch[1]);
+                                    if (!isNaN(val) && val > 0 && val < 50000) {
+                                        currentVal = val;
+                                    }
+                                }
+                            }
+
                             const timeKey = item.created_at.substring(0, 16);
                             const txnSignature = `${timeKey}_${currentVal}`;
                             if (currentVal > 0 && !groups[key].seenAmounts.has(txnSignature)) {
@@ -350,7 +369,7 @@
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
                             groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源重复推送），实现全渠道流水汇总。`;
                             groups[key].lastTime = item.created_at;
-                        } 
+                        }
                         // 2. 快递类处理
                         else if (isExpressDelivery) {
                             const batchId = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
@@ -503,7 +522,7 @@
                             return;
                         }
 
-                        // 前端本地对真实消费金额做统计算法（严格过滤掉拦截类、优惠券促销通知）
+                        // 前端本地对真实消费金额做统计算法（严格过滤掉拦截类、优惠券促销通知及银行卡尾号）
                         let totalSum = 0;
                         allItems.forEach(item => {
                             const cat = item.data.category;
@@ -511,17 +530,22 @@
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const lowerText = fullText.toLowerCase();
 
-                            // 如果是拦截类消息，或者文本中包含优惠券、促销、领取等营销字眼，直接跳过，不计入真实支出
+                            // 如果是拦截类消息，或者包含营销字眼，跳过
                             if (isBlocked || lowerText.includes('优惠券') || lowerText.includes('消费券') || lowerText.includes('满减') || lowerText.includes('领取') || lowerText.includes('白条额度') || lowerText.includes('降价')) {
                                 return;
                             }
 
-                            const matches = fullText.match(/(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g);
-                            if (matches) {
-                                matches.forEach(m => {
-                                    const v = parseFloat(m);
-                                    if (!isNaN(v) && v < 100000) totalSum += v;
-                                });
+                            // 排除尾号防误伤
+                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
+
+                            // 优先匹配带小数点的金额或带元字的金额
+                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g;
+                            let match;
+                            while ((match = moneyRegex.exec(cleanText)) !== null) {
+                                const v = parseFloat(match[1]);
+                                if (!isNaN(v) && v > 0 && v < 100000) {
+                                    totalSum += v;
+                                }
                             }
                         });
 
