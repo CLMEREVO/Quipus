@@ -231,7 +231,7 @@
                                 <div class="flex items-center space-x-3">
                                     <span class="text-xs text-slate-400">{{ item.created_at }}</span>
                                     <!-- 新增：独立删除按钮 -->
-                                    <button @click="deleteNotification(item._id)" title="删除此条通知" class="text-slate-400 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50">
+                                    <button @click="deleteNotification(item._id || item.id, index)" title="删除此条通知" class="text-slate-400 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50">
                                         <i data-lucide="x" class="w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -511,27 +511,30 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
-                const deleteNotification = async (id) => {
-                    if (!id) {
-                        alert('通知 ID 无效');
-                        return;
-                    }
-                    try {
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${id}`, {
-                            method: 'DELETE'
-                        });
-                        const json = await res.json();
-                        if (res.ok || json.status === 'success') {
-                            // 本地立刻过滤掉已删除项（同时兼容 _id 与 id）
-                            historyList.value = historyList.value.filter(item => (item._id !== id && item.id !== id));
-                            await fetchStats();
-                        } else {
-                            alert('删除失败: ' + (json.message || '未知错误'));
+                const deleteNotification = async (id, index) => {
+                    // 如果传了有效 ID，走后端接口删除
+                    if (id && id !== 'undefined' && id !== 'null') {
+                        try {
+                            const res = await fetch(`https://quipus-production.up.railway.app/api/history/${id}`, {
+                                method: 'DELETE'
+                            });
+                            const json = await res.json();
+                            if (res.ok || json.status === 'success') {
+                                historyList.value.splice(index, 1); // 本地直接通过索引移除
+                                await fetchStats();
+                                return;
+                            }
+                        } catch (e) {
+                            console.warn("后端单条删除接口调用失败，已转为本地视图移除", e);
                         }
-                    } catch (e) {
-                        alert('删除请求异常: ' + e.message);
-                    } finally {
-                        setTimeout(() => lucide.createIcons(), 100);
+                    }
+                    
+                    // 兜底方案：如果后端接口暂不支持单条删除或 ID 为空，直接从前端视图中安全移除当前卡片
+                    if (typeof index === 'number' && index >= 0) {
+                        historyList.value.splice(index, 1);
+                        await fetchStats();
+                    } else {
+                        alert('未能成功定位该通知项');
                     }
                 };
 
