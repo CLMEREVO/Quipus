@@ -535,7 +535,7 @@
                             return;
                         }
 
-                        // 前端本地对真实消费金额做统计算法（严格过滤掉拦截类、优惠券促销通知及银行卡尾号）
+                        // 前端本地对真实消费金额做统计算法（仅遍历底层原始通知列表，绝对不重复扫描大模型生成的摘要）
                         let totalSum = 0;
                         allItems.forEach(item => {
                             const cat = item.data.category;
@@ -543,26 +543,25 @@
                             const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
                             const lowerText = fullText.toLowerCase();
 
-                            // 如果是拦截类消息，或者包含营销字眼，跳过
+                            // 排除拦截类、营销券、卡号尾号
                             if (isBlocked || lowerText.includes('优惠券') || lowerText.includes('消费券') || lowerText.includes('满减') || lowerText.includes('领取') || lowerText.includes('白条额度') || lowerText.includes('降价')) {
                                 return;
                             }
 
-                            // 排除尾号防误伤
                             let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
 
-                            // 优先匹配带小数点的金额或带元字的金额
+                            // 匹配有效金额
                             const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g;
                             let match;
                             while ((match = moneyRegex.exec(cleanText)) !== null) {
                                 const v = parseFloat(match[1]);
                                 if (!isNaN(v) && v > 0 && v < 100000) {
                                     totalSum += v;
+                                    break; // 每条通知只取一个核心支付金额，防止单条通知内出现多个数字被重复累加
                                 }
                             }
                         });
 
-                        const realTexts = allItems.map(item => item.original);
                         const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -573,7 +572,7 @@
                             const resData = json.aggregated_result;
                             let finalSummary = resData.merged_summary || "已成功为您处理并融合相关通知。";
                             
-                            // 1. 保留昨天的核心优化：处理作业通知中“26号”与“周五”的时间覆盖文案收敛，避免产生“两次作业”的歧义
+                            // 保留作业时间覆盖收敛逻辑
                             if (finalSummary.includes('26号') && (finalSummary.includes('周五') || finalSummary.includes('星期五'))) {
                                 finalSummary = finalSummary.replace(/并提醒26号之前交第[^，,\n]*[，,\n]*/g, '');
                                 finalSummary = finalSummary.replace(/26号[^，,\n]*交[^，,\n]*[，,\n]*/g, '');
@@ -582,13 +581,13 @@
                                 }
                             }
 
-                            // 2. 兼容性优化：修正“同时”等容易产生歧义的表述
                             finalSummary = finalSummary.replace(/同时/g, '先后');
 
-                            // 3. 完美兼容金额追加：只要计算出了 totalSum > 0，就强制且精准地追加总消费统计，绝不被摘要里的“元”字拦截！
+                            // 关键清理：先抹掉大模型摘要里自带的所有带“元”的金额字眼，防止与前端精确计算的总额冲突或被二次累加
+                            finalSummary = finalSummary.replace(/共?[\d\.]+元/g, '').replace(/合计[\d\.]+元/g, '');
+
+                            // 强制精准拼接前端算出来的总消费金额
                             if (totalSum > 0) {
-                                // 清除可能重复出现的旧金额描述
-                                finalSummary = finalSummary.replace(/合计[\d\.]+元[，,]?/g, '');
                                 finalSummary += ` 【今日累计支出：¥${totalSum.toFixed(2)}】`;
                             }
 
