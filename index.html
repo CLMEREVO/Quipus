@@ -570,9 +570,10 @@
                         });
                         const json = await res.json();
                         
-                        if (json.status === "success" && json.aggregated_result) {
-                            const resData = json.aggregated_result;
-                            let finalSummary = resData.merged_summary || "已成功为您处理并融合相关通知。";
+                        if (json.status === "success") {
+                            // 强力兼容后端所有可能的返回字段结构
+                            const resData = json.aggregated_result || json.data || json;
+                            let finalSummary = resData.merged_summary || resData.summary || resData.text || "已成功为您处理并融合相关通知。";
                             
                             // 保留作业时间覆盖收敛逻辑
                             if (finalSummary.includes('26号') && (finalSummary.includes('周五') || finalSummary.includes('星期五'))) {
@@ -594,7 +595,7 @@
                             }
 
                             aggResult.value = { 
-                                title: resData.event_title || "多源通知智能聚合", 
+                                title: resData.event_title || resData.title || "多源通知智能聚合", 
                                 summary: finalSummary 
                             };
                         } else {
