@@ -286,13 +286,13 @@
                         
                         const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
                         
+                        // 优化后的金融支付判定：必须包含明确的支付动词，且绝对不能是普通的教务、作业、停水等通知
                         const isFinancialPayment = cat === '其他类' && (
-                            textToCheck.includes('支付') || 
-                            textToCheck.includes('付款') || 
-                            textToCheck.includes('充值') || 
-                            textToCheck.includes('元') || 
-                            textToCheck.includes('支出') || 
-                            textToCheck.includes('快捷支付')
+                            (textToCheck.includes('支付成功') || textToCheck.includes('付款成功') || textToCheck.includes('已支付') || textToCheck.includes('银行卡支付')) &&
+                            !textToCheck.includes('停水') && 
+                            !textToCheck.includes('测验') && 
+                            !textToCheck.includes('作业') && 
+                            !textToCheck.includes('截止')
                         );
                         
                         const isExpressDelivery = cat === '其他类' && (
@@ -387,7 +387,7 @@
                             groups[key].businessCount = validTxnCount;
                             
                             const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
-                            groups[key].lastSummary = `${amountStr} 已成功聚合 ${groups[key].businessCount} 笔独立消费账单（已自动过滤多源同秒重复推送）。`;
+                            groups[key].lastSummary = `${amountStr} 已成功统计 ${groups[key].businessCount} 笔独立消费账单。`;
                         }
                         // 2. 快递类处理
                         else if (isExpressDelivery) {
