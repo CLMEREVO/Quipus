@@ -590,35 +590,48 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
-                const deleteNotification = async (id, index) => {
-                    // 1. 如果传了有效 ID，走后端接口删除
-                    if (id && id !== 'undefined' && id !== 'null') {
-                        try {
-                            const res = await fetch(`https://quipus-production.up.railway.app/api/history/${id}`, {
-                                method: 'DELETE'
-                            });
-                            const json = await res.json();
-                            if (res.ok || json.status === 'success') {
-                                historyList.value.splice(index, 1); // 本地直接通过索引移除
-                                await fetchStats();
-                                setTimeout(() => lucide.createIcons(), 50); // 核心补全：移除卡片后重新渲染剩余卡片的删除图标
-                                return;
-                            }
-                        } catch (e) {
-                            console.warn("后端单条删除接口调用失败，已转为本地视图移除", e);
-                        }
-                    }
+                const deleteNotification = async (item, index) => {
+                    // 兼容获取真实的数据库唯一标识（无论是 _id 还是 id）
+                    const realId = item._id || item.id;
                     
-                    // 2. 兜底方案：直接从前端视图中安全移除当前卡片
-                    if (typeof index === 'number' && index >= 0) {
-                        historyList.value.splice(index, 1);
-                        await fetchStats();
-                        setTimeout(() => lucide.createIcons(), 50); // 核心补全：重新渲染图标
-                    } else {
-                        alert('未能成功定位该通知项');
+                    if (!realId) {
+                        alert('通知 ID 无效，无法执行后端删除');
+                        return;
+                    }
+
+                    try {
+                        // 1. 核心：向后端发送真正的 DELETE 请求，从数据库中彻底抹除该条通知！
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
+                            method: 'DELETE'
+                        });
+                        const json = await res.json().catch(() => ({}));
+
+                        if (res.ok || json.status === 'success') {
+                            // 2. 数据库删除成功后，安全地从当前前端视图列表中移除
+                            if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
+                                historyList.value.splice(index, 1);
+                            } else {
+                                // 如果索引不准，按 ID 过滤
+                                historyList.value = historyList.value.filter(i => (i._id !== realId && i.id !== realId));
+                            }
+
+                            // 3. 实时同步更新顶部统计看板数据
+                            await fetchStats();
+                            
+                            // 4. 重置全局聚合摘要缓存，防止聚合数目停留在旧状态
+                            aggResult.value = null;
+
+                            // 5. 重新渲染 Lucide 图标
+                            setTimeout(() => lucide.createIcons(), 50);
+                        } else {
+                            alert('后端删除失败: ' + (json.message || '未知错误'));
+                        }
+                    } catch (e) {
+                        console.error('删除请求异常:', e);
+                        alert('删除请求异常，请检查网络或后端服务: ' + e.message);
                     }
                 };
-
+                
                 const refreshSeedData = async () => {
                     try {
                         const res = await fetch('https://quipus-production.up.railway.app/api/seed/refresh', { method: 'POST' });
