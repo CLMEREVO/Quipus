@@ -406,7 +406,7 @@
                             if (rawSummary.includes('营销') || rawSummary.includes('促销') || rawSummary.includes('优惠') || rawSummary.includes('京东') || rawSummary.includes('淘宝')) {
                                 groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
                             } else {
-                                groups[key].lastSummary = `[自定义策略拦截] ${rawSummary}`;
+                                groups[key].lastSummary = `${rawSummary}`;
                             }
                             groups[key].lastTime = item.created_at;
                         }
@@ -435,15 +435,26 @@
                     fetchingHistory.value = true;
                     try {
                         let tabParam = currentTab.value === 'express' ? 'overview' : currentTab.value;
-                        if (tabParam === 'other') tabParam = 'other'; // 确保参数正确
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${tabParam}&limit=500`);
                         const json = await res.json();
                         if (json.status === 'success') {
-                            // 前端做一层双保险过滤：如果在 “other” 标签下，把包含 “其他类” 或 “其他类消息” 的都放进来
+                            // 对所有历史数据的分类名称进行前端规范化映射，彻底解决“其他类消息”与“其他类”不统一的问题
+                            let items = json.items.map(item => {
+                                if (item.data && item.data.category) {
+                                    if (item.data.category === '其他类消息' || item.data.category === '物流与消费') {
+                                        item.data.category = '其他类';
+                                    }
+                                }
+                                return item;
+                            });
+
+                            // 如果当前在 “other” 标签页，确保把所有“其他类”的通知精准过滤并呈现出来
                             if (currentTab.value === 'other') {
-                                historyList.value = json.items.filter(i => i.data.category === '其他类' || i.data.category === '其他类消息' || i.data.category === '物流与消费');
+                                historyList.value = items.filter(i => i.data.category === '其他类');
+                            } else if (currentTab.value === 'overview') {
+                                historyList.value = items;
                             } else {
-                                historyList.value = json.items;
+                                historyList.value = items;
                             }
                         }
                     } catch (e) { 
