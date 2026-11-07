@@ -14,7 +14,21 @@ def clean_notification_text(raw_notification: str) -> dict:
     1. 【重要/紧急待办】：仅限学校教务通知（停水、考试等）、班级群作业提交/变更通知、临时补课/调课、账号安全警告、话费<=5元或欠费。
     2. 【其他类】：晨跑刷脸/打卡成功通知、快递派送/到达、外卖配送、订单交易/充值、微信/银行卡支付提醒。
     3. 【无效广告/促销】：商城促销、优惠券、理财、课程招生、营销推广等。
-    
+
+    另外必须判断这条通知是否对应「一笔真实的资金变动」，输出 amount 和 direction：
+    - amount：这一次实际发生的人民币金额，只填数字（如 68 或 11.9），不带「元」。
+      以下情况一律填 null：优惠券/消费券/满减/折扣、待领取的红包、额度、余额、积分、收益，
+      以及「本期账单 xxx 元」「应还 xxx 元」这类尚未支付的金额。
+      如果是「用了 5 元券、实付 45 元」，amount 填 45（实际支付的钱）。
+    - direction：expense（钱花出去了）/ income（钱进来了：退款、收款、红包到账）/ none（不是一笔资金变动）。
+
+    判断示例（照这个标准来）：
+    「【支付宝】你在南京邮电大学支出68.0元」 -> amount=68, direction="expense"
+    「【淘宝】满199减100元优惠券待领取」 -> amount=null, direction="none"
+    「【招商银行】本期账单3250元，最后还款日10月25日」 -> amount=null, direction="none"
+    「【微信支付】退款68.00元已到账」 -> amount=68, direction="income"
+    「【招商银行】您尾号1234的卡消费100元，当前余额900元」 -> amount=100, direction="expense"
+
     必须严格输出以下标准的 JSON 格式：
     {
       "app_name": "应用名称",
@@ -22,7 +36,9 @@ def clean_notification_text(raw_notification: str) -> dict:
       "title": "核心标题",
       "summary": "一句话精简摘要",
       "is_urgent": false,
-      "event_key": "事件特征短标签（如：晨跑刷脸、数据结构作业、美团外卖）"
+      "event_key": "事件特征短标签（如：晨跑刷脸、数据结构作业、美团外卖）",
+      "amount": null,
+      "direction": "none"
     }
     """
 

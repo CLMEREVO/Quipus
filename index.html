@@ -163,12 +163,58 @@
                     <div v-else-if="dynamicAggregations.length === 0" class="text-center py-12 text-slate-400">暂无聚合记录，请在“通知概览”中提交通知并清洗！</div>
 
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                        <div v-for="group in dynamicAggregations" :key="group.key" class="p-4 md:p-5 bg-gradient-to-br from-indigo-50/60 to-blue-50/60 rounded-xl border border-indigo-200 shadow-sm space-y-2.5 md:space-y-3">
-                            <div class="flex items-center justify-between gap-2 flex-wrap">
-                                <span class="font-bold text-sm text-indigo-900 flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}</span>
-                                <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">已自动聚合 {{ group.businessCount }} 项核心事件</span>                            </div>
-                            <p class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
-                            <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                        <div v-for="group in dynamicAggregations" :key="group.key"
+                             :class="group.kind === 'payment' ? 'md:col-span-2 bg-gradient-to-br from-amber-50/70 to-indigo-50/70 border-amber-200' : 'bg-gradient-to-br from-indigo-50/60 to-blue-50/60 border-indigo-200'"
+                             class="p-4 md:p-5 rounded-xl border shadow-sm space-y-2.5 md:space-y-3">
+
+                            <!-- 支付/消费：一张卡汇总所有笔数与金额 -->
+                            <template v-if="group.kind === 'payment'">
+                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                        <i data-lucide="wallet" class="w-4 h-4"></i> {{ group.key }}
+                                    </span>
+                                    <span class="text-[10px] md:text-xs bg-white/70 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                        共 {{ group.businessCount }} 笔<template v-if="group.mergedCount > 0"> · 去重 {{ group.mergedCount }} 条同源推送</template>
+                                    </span>
+                                </div>
+
+                                <div class="flex items-end gap-5 flex-wrap">
+                                    <div>
+                                        <div class="text-[10px] md:text-xs text-slate-500 mb-0.5">今日支出</div>
+                                        <span class="text-2xl md:text-3xl font-bold text-indigo-900 leading-none tabular-nums">¥{{ group.totalAmount.toFixed(2) }}</span>
+                                    </div>
+                                    <div v-if="group.incomeTotal > 0">
+                                        <div class="text-[10px] md:text-xs text-slate-500 mb-0.5">今日收入</div>
+                                        <span class="text-lg md:text-xl font-bold text-emerald-600 leading-none tabular-nums">¥{{ group.incomeTotal.toFixed(2) }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
+                                    <div v-for="(tx, i) in group.txns.slice(0, 5)" :key="i" class="flex items-center gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
+                                        <span class="flex-1 min-w-0 truncate text-slate-700 font-medium">{{ tx.apps.join(' + ') }}</span>
+                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ tx.time }}</span>
+                                        <span class="shrink-0 font-bold tabular-nums"
+                                              :class="tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-800'">
+                                            {{ tx.direction === 'income' ? '+' : '−' }}¥{{ tx.amount.toFixed(2) }}
+                                        </span>
+                                    </div>
+                                    <div v-if="group.txns.length > 5" class="px-2.5 py-1.5 text-[10px] text-slate-400">
+                                        还有 {{ group.txns.length - 5 }} 笔未展开…
+                                    </div>
+                                </div>
+
+                                <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                            </template>
+
+                            <!-- 其它类型：保持原样 -->
+                            <template v-else>
+                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}</span>
+                                    <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">已自动聚合 {{ group.businessCount }} 项核心事件</span>
+                                </div>
+                                <p class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
+                                <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -329,6 +375,91 @@
                     return titles[currentTab.value] || '';
                 };
 
+                // ---- 收支识别 ----
+                // 1) 新数据：模型直接给 amount + direction，最可靠
+                // 2) 老数据：没有这两个字段，退回正则兜底
+                const PAY_DEDUPE_MS = 5000;   // 同额同向的合并窗口（时间精确到秒，实际约 5 秒）
+
+                // 通知里的【应用名】本身含「支付宝/银行」，会伪装成支付，先剥掉
+                const stripAppTag = (s) => String(s || '').replace(/【[^】]{0,16}】/g, ' ').replace(/\[[^\]]{0,16}\]/g, ' ');
+                const payText = (item) => `${item.data.title || ''} ${item.data.summary || ''} ${item.original || ''}`;
+
+                const PAY_STRONG = /(支付成功|付款成功|已支付|已付款|支付了|付款了|已扣款|扣款成功|消费成功|交易成功|充值成功|实付|实际支付)/;
+                const PAY_ACT = /(支付|付款|消费|扣款|支出|交易|充值)/;
+                const HARD_NOISE = /(优惠券|消费券|满减|立减|折扣|优惠|红包|额度|收益|利息|退款|退货|转账|还款|待还|应还|积分|抽奖|领取|中奖)/;
+                const SOFT_NOISE = /(余额|账单|分期|免息)/;
+                const NOT_MONEY = /(快递|包裹|菜鸟|驿站|取件|派送|停水|停电|检修|作业|测验|考试|截止|促销|理财|广告)/;
+
+                // 入账：退款 / 收款 / 红包到账
+                const INCOME_KW = /(退款|退回|已退|退货|入账|收款|到账|收到一笔|红包)/;
+                const INCOME_NOISE = /(优惠券|满减|折扣|最高|待领取|领取|即将过期|额度)/;
+
+                const toTs = (s) => {
+                    const m = String(s || '').match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) : NaN;
+                };
+
+                // 统一成 HH:MM —— 种子数据里存在 "7:20:00" 这种单位数小时，直接 slice 会切错
+                const toHHMM = (s) => {
+                    const m = String(s || '').match(/\d{4}-\d{1,2}-\d{1,2}[ T](\d{1,2}):(\d{2})/);
+                    return m ? `${String(m[1]).padStart(2, '0')}:${m[2]}` : '';
+                };
+
+                // 通用金额提取：先剔卡号/单号，再去千分位
+                const amountIn = (body) => {
+                    const clean = body
+                        .replace(/(尾号|卡号|账号|订单号|单号|取件码|手机号|电话|编号)\s*[:：]?\s*\d+/g, ' ')
+                        .replace(/(\d),(?=\d{3}(?:\D|$))/g, '$1');
+                    const pick = (re) => { const m = clean.match(re); return m ? parseFloat(m[1]) : 0; };
+                    let v = pick(/(?:实付|实际支付|折后)\s*[:：]?\s*(\d+(?:\.\d{1,2})?)/);
+                    if (!v) v = pick(/(\d+(?:\.\d{1,2})?)\s*(?:元|块钱|块)/);
+                    if (!v) v = pick(/[¥￥]\s*(\d+(?:\.\d{1,2})?)/);
+                    if (!v) v = pick(/(?:CNY|RMB)\s*(\d+(?:\.\d{1,2})?)/i);
+                    if (!v) v = pick(/(?:金额|合计|共计)\s*[:：]?\s*(?:CNY|RMB|¥|￥)?\s*(\d+(?:\.\d{1,2})?)/i);
+                    return v > 0 && v < 100000 ? v : 0;
+                };
+
+                const parseAmount = (raw) => {
+                    const body = stripAppTag(raw);
+                    if (!body.trim()) return 0;
+                    const strong = PAY_STRONG.test(body);
+                    const act = PAY_ACT.test(body);
+                    if (!strong) {
+                        if (HARD_NOISE.test(body) || NOT_MONEY.test(body)) return 0;
+                        if (!act && !/账单/.test(body)) return 0;
+                        if (!act && SOFT_NOISE.test(body)) return 0;
+                    }
+                    return amountIn(body);
+                };
+
+                const parseIncome = (raw) => {
+                    const body = stripAppTag(raw);
+                    if (!body.trim() || !INCOME_KW.test(body)) return 0;
+                    if (INCOME_NOISE.test(body)) return 0;
+                    return amountIn(body);
+                };
+
+                // 返 { amount, direction } 或 null
+                const detectPayment = (item) => {
+                    const d = item.data || {};
+                    const dir = String(d.direction || '').toLowerCase();
+                    const amt = typeof d.amount === 'number' ? d.amount : parseFloat(d.amount);
+                    if (dir === 'expense' || dir === 'income') {
+                        if (Number.isFinite(amt) && amt > 0 && amt < 100000) {
+                            return { amount: amt, direction: dir };
+                        }
+                    } else if (dir === 'none') {
+                        return null;   // 模型明确判定「不是一笔钱」，尊重它
+                    }
+                    // 老数据兜底：先判断是不是入账，再判断支出
+                    const text = payText(item);
+                    const inc = parseIncome(text);
+                    if (inc > 0) return { amount: inc, direction: 'income' };
+                    const exp = parseAmount(text);
+                    if (exp > 0) return { amount: exp, direction: 'expense' };
+                    return null;
+                };
+
                 const dynamicAggregations = computed(() => {
                     const groups = {};
                     
@@ -340,16 +471,11 @@
                         
                         const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
                         
-                        // 优化后的金融支付判定：必须包含明确的支付动词，且绝对不能是普通的教务、作业、停水等通知
-                        const isFinancialPayment = cat === '其他类' && (
-                            (textToCheck.includes('支付成功') || textToCheck.includes('付款成功') || textToCheck.includes('已支付') || textToCheck.includes('银行卡支付')) &&
-                            !textToCheck.includes('停水') && 
-                            !textToCheck.includes('测验') && 
-                            !textToCheck.includes('作业') && 
-                            !textToCheck.includes('截止')
-                        );
+                        // 收支判定：优先用模型给的 amount / direction，老数据走正则兜底
+                        const pay = isBlocked ? null : detectPayment(item);
+                        const isFinancialPayment = !!pay;
                         
-                        const isExpressDelivery = cat === '其他类' && (
+                        const isExpressDelivery = !isFinancialPayment && cat === '其他类' && (
                             textToCheck.includes('快递') || 
                             textToCheck.includes('包裹') || 
                             textToCheck.includes('菜鸟') || 
@@ -367,9 +493,14 @@
                         if (!groups[key]) {
                             groups[key] = { 
                                 key: key, 
+                                kind: isBlocked ? 'blocked' : (isFinancialPayment ? 'payment' : (isExpressDelivery ? 'express' : 'normal')),
                                 count: 0, 
                                 businessCount: 0, 
                                 totalAmount: 0, 
+                                incomeTotal: 0,
+                                txns: [],
+                                mergedCount: 0,
+                                lastTs: 0,
                                 seenAmounts: new Set(), 
                                 expressSet: new Set(), 
                                 lastSummary: item.data.summary, 
@@ -387,61 +518,45 @@
                             }
                         }
                         
-                        // 1. 支付类处理（采用全量收集、精准去重、独立累加的完美方案）
+                        // 1. 收支处理：同向、同额、5 秒内视为同一笔；其余各算一笔
                         if (isFinancialPayment) {
-                            const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
-                            
-                            // 排除卡号尾号防误伤
-                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
-                            
-                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|\b)?/gi;
-                            let match;
-                            let currentVal = 0;
-                            
-                            while ((match = moneyRegex.exec(cleanText)) !== null) {
-                                const val = parseFloat(match[1]);
-                                if (!isNaN(val) && val > 0 && val < 50000) {
-                                    currentVal = val;
-                                    break;
-                                }
+                            const txn = {
+                                amount: pay.amount,
+                                direction: pay.direction,
+                                ts: toTs(item.created_at),
+                                time: toHHMM(item.created_at),
+                                raw: (item.original || '').trim(),
+                                apps: [item.data.app_name || '未知来源'],
+                            };
+                            // 同一笔的三个判据：
+                            //   ① 同向 + 同额 + 间隔 < 5 秒（多源推送到达时间差）
+                            //   ② 原文完全相同且在 10 分钟内（同一条消息被重复导入）
+                            const dup = groups[key].txns.find(
+                                (t) => (t.direction === txn.direction
+                                        && Math.abs(t.amount - txn.amount) < 0.005
+                                        && Math.abs(t.ts - txn.ts) < PAY_DEDUPE_MS)
+                                    || (txn.raw && t.raw === txn.raw && Math.abs(t.ts - txn.ts) < 600000)
+                            );
+                            if (dup) {
+                                if (!dup.apps.includes(txn.apps[0])) dup.apps.push(txn.apps[0]);
+                                groups[key].mergedCount += 1;
+                            } else {
+                                groups[key].txns.push(txn);
                             }
-                            
-                            // 确保将每一笔有效的独立消费记录其签名存入集合
-                            if (currentVal > 0) {
-                                // 赋予每条消息唯一的标识（消息ID或时间+金额），确保多笔不同金额的消费绝不丢失
-                                const uniqueTxnId = `${item.created_at}_${currentVal}_${Math.random()}`;
-                                
-                                // 检查是否是多源同秒同金额重复推送
-                                let isDuplicate = false;
-                                groups[key].seenAmounts.forEach(sig => {
-                                    const [oldTime, oldVal] = sig.split('_');
-                                    const timeDiff = Math.abs(new Date(item.created_at).getTime() - new Date(oldTime).getTime());
-                                    if (parseFloat(oldVal) === currentVal && timeDiff < 3000) {
-                                        isDuplicate = true;
-                                    }
-                                });
-
-                                if (!isDuplicate) {
-                                    groups[key].seenAmounts.add(`${item.created_at}_${currentVal}`);
-                                }
+                            groups[key].businessCount = groups[key].txns.length;
+                            groups[key].totalAmount = groups[key].txns
+                                .filter((t) => t.direction === 'expense')
+                                .reduce((s, t) => s + t.amount, 0);
+                            groups[key].incomeTotal = groups[key].txns
+                                .filter((t) => t.direction === 'income')
+                                .reduce((s, t) => s + t.amount, 0);
+                            groups[key].lastSummary =
+                                `支出 ¥${groups[key].totalAmount.toFixed(2)} · 收入 ¥${groups[key].incomeTotal.toFixed(2)}`
+                                + `（共 ${groups[key].businessCount} 笔，去重 ${groups[key].mergedCount} 条）`;
+                            if (!groups[key].lastTs || txn.ts >= groups[key].lastTs) {
+                                groups[key].lastTs = txn.ts;
+                                groups[key].lastTime = item.created_at;
                             }
-
-                            // 重新遍历 seenAmounts 计算真正的总金额和总笔数，确保万无一失！
-                            let realTotal = 0;
-                            let validTxnCount = 0;
-                            groups[key].seenAmounts.forEach(sig => {
-                                const parts = sig.split('_');
-                                if (parts.length >= 2) {
-                                    realTotal += parseFloat(parts[1]);
-                                    validTxnCount += 1;
-                                }
-                            });
-
-                            groups[key].totalAmount = realTotal;
-                            groups[key].businessCount = validTxnCount;
-                            
-                            const amountStr = groups[key].totalAmount > 0 ? `【今日累计支出：¥${groups[key].totalAmount.toFixed(2)}】` : '';
-                            groups[key].lastSummary = `${amountStr} 已成功统计 ${groups[key].businessCount} 笔独立消费账单。`;
                         }
                         // 2. 快递类处理
                         else if (isExpressDelivery) {
@@ -474,7 +589,12 @@
                         }
                     });
                     
-                    return Object.values(groups);
+                    // 支付明细按时间倒序，最新一笔在最上面
+                    const list = Object.values(groups);
+                    list.forEach(g => {
+                        if (g.kind === 'payment') g.txns.sort((a, b) => b.ts - a.ts);
+                    });
+                    return list;
                 });
 
                 const fetchStats = async () => {
