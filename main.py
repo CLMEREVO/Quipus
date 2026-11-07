@@ -108,6 +108,13 @@ def get_stats():
 def delete_history():
     return {"status": "success", "deleted": clear()}
 
+@app.delete("/api/history/{item_id}")
+def delete_one(item_id: int):
+    removed = delete_notification(item_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="通知不存在或已被删除")
+    return {"status": "success", "deleted_id": item_id}    
+
 @app.post("/api/seed/refresh")
 def refresh_seed():
     added = force_seed_samples()

@@ -198,6 +198,13 @@ def clear() -> int:
             conn.execute("DELETE FROM notifications")
     return n
 
+def delete_notification(item_id: int) -> int:
+    """按 id 删除单条通知，返回真正删掉的行数（0 = 这条不存在）。"""
+    with closing(_connect()) as conn:
+        with conn:
+            cur = conn.execute("DELETE FROM notifications WHERE id = ?", (item_id,))
+            return cur.rowcount    
+
 def get_custom_rules() -> list[dict[str, Any]]:
     with closing(_connect()) as conn:
         rows = conn.execute("SELECT * FROM custom_rules ORDER BY id DESC").fetchall()

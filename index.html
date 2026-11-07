@@ -231,7 +231,7 @@
                                 <div class="flex items-center space-x-3">
                                     <span class="text-xs text-slate-400">{{ item.created_at }}</span>
                                     <!-- 新增：独立删除按钮 -->
-                                    <button @click="deleteNotification(item._id || item.id, index)" title="删除此条通知" class="text-slate-400 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50">
+                                    <button @click="deleteNotification(item)" title="删除此条通知" class="text-slate-400 hover:text-rose-600 transition p-1 rounded hover:bg-rose-50">
                                         <i data-lucide="x" class="w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -611,48 +611,29 @@
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
 
-                const deleteNotification = async (item, index) => {
-                    // 1. 提取内容指纹作为唯一身份证，写入本地黑名单
-                    const appName = item.data?.app_name || '';
-                    const title = item.data?.title || '';
-                    const summary = item.data?.summary || '';
-                    const contentFingerprint = `${appName}_${title}_${summary}`.trim();
+                const deleteNotification = async (item) => {
+                    const realId = item?._id ?? item?.id ?? item?.notification_id;
+                    if (!realId) { alert('这条记录没有 id，无法删除'); return; }
 
-                    if (contentFingerprint && contentFingerprint !== '__') {
-                        try {
-                            let deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
-                            if (!deletedFingerprints.includes(contentFingerprint)) {
-                                deletedFingerprints.push(contentFingerprint);
-                                localStorage.setItem('quipus_deleted_fingerprints', JSON.stringify(deletedFingerprints));
-                            }
-                        } catch (e) {}
-                    }
-
-                    // 2. 尝试异步通知后端删除（不阻塞前端，失败也无所谓，反正本地已经封杀）
-                    let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
-                    if (realId) {
-                        fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' }).catch(() => {});
-                    }
-
-                    // 3. 核心：直接在当前内存数组中彻底剔除该卡片，绝不重新请求后端接口！
-                    if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
-                        historyList.value.splice(index, 1);
-                    } else {
-                        historyList.value = historyList.value.filter(i => {
-                            const fp = `${i.data?.app_name || ''}_${i.data?.title || ''}_${i.data?.summary || ''}`.trim();
-                            return fp !== contentFingerprint;
-                        });
-                    }
-
-                    // 4. 同步更新顶部统计看板数字（不重新拉取列表，只更新统计）
-                    if (typeof fetchStats === 'function') {
-                        await fetchStats().catch(() => {});
-                    }
-
-                    // 5. 重置全局聚合摘要缓存，使其重新计算
+                    // 1. 乐观更新：先从当前列表剔除，界面立刻响应
+                    historyList.value = historyList.value.filter(
+                        i => (i._id ?? i.id ?? i.notification_id) !== realId
+                    );
                     aggResult.value = null;
 
-                    // 6. 重新渲染图标
+                    // 2. 真删：调后端 DELETE /api/history/{id}，把数据库里那条记录删掉
+                    try {
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    } catch (e) {
+                        // 3. 删除失败就回滚到服务端真实状态，绝不假装删成功
+                        alert('删除失败：' + e.message + '，已恢复列表');
+                        await fetchHistory();
+                        return;
+                    }
+
+                    // 4. 以后端为准刷新统计数字
+                    await fetchStats();
                     setTimeout(() => lucide.createIcons(), 50);
                 };
 
