@@ -438,10 +438,10 @@
                         const json = await res.json();
                         
                         if (json.status === 'success' && json.items) {
-                            // 获取本地已被删除的 ID 列表（黑名单）
-                            let deletedIds = [];
+                            // 获取本地已被删除的内容指纹黑名单
+                            let deletedFingerprints = [];
                             try {
-                                deletedIds = JSON.parse(localStorage.getItem('quipus_deleted_ids') || '[]');
+                                deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
                             } catch (e) {}
 
                             let allItems = json.items.map(item => {
@@ -453,10 +453,13 @@
                                 return item;
                             });
 
-                            // 核心：过滤掉所有在黑名单中的已删除记录！
+                            // 核心：基于“内容指纹”过滤掉所有被用户删除过的通知！
                             allItems = allItems.filter(item => {
-                                const id = item._id || item.id || item.notification_id || (item.data && item.data._id);
-                                return !id || !deletedIds.includes(id);
+                                const appName = item.data?.app_name || '';
+                                const title = item.data?.title || '';
+                                const summary = item.data?.summary || '';
+                                const fp = `${appName}_${title}_${summary}`.trim();
+                                return !deletedFingerprints.includes(fp);
                             });
 
                             // 按当前 Tab 本地过滤
@@ -600,40 +603,48 @@
                 };
 
                 const deleteNotification = async (item, index) => {
-                    let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
-                    
-                    // 1. 无论后端删没删成功，首先写入浏览器的本地删除黑名单（localStorage）
-                    if (realId) {
+                    // 1. 提取或生成该条通知的唯一“内容指纹”（App + 标题 + 摘要）
+                    const appName = item.data?.app_name || '';
+                    const title = item.data?.title || '';
+                    const summary = item.data?.summary || '';
+                    const contentFingerprint = `${appName}_${title}_${summary}`.trim();
+
+                    // 2. 将指纹存入浏览器的本地黑名单（localStorage）
+                    if (contentFingerprint && contentFingerprint !== '__') {
                         try {
-                            let deletedIds = JSON.parse(localStorage.getItem('quipus_deleted_ids') || '[]');
-                            if (!deletedIds.includes(realId)) {
-                                deletedIds.push(realId);
-                                localStorage.setItem('quipus_deleted_ids', JSON.stringify(deletedIds));
+                            let deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
+                            if (!deletedFingerprints.includes(contentFingerprint)) {
+                                deletedFingerprints.push(contentFingerprint);
+                                localStorage.setItem('quipus_deleted_fingerprints', JSON.stringify(deletedFingerprints));
                             }
                         } catch (err) {
-                            console.warn("本地存储写入失败", err);
+                            console.warn("本地指纹写入失败", err);
                         }
                     }
 
-                    // 2. 尝试调用后端删除接口
+                    // 3. 尝试调用后端删除接口（用真实的 id）
+                    let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
                     if (realId) {
                         try {
                             await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
                                 method: 'DELETE'
                             });
                         } catch (e) {
-                            console.warn("后端删除接口调用异常，已由本地黑名单兜底", e);
+                            console.warn("后端删除接口调用异常，已由本地指纹黑名单兜底", e);
                         }
                     }
 
-                    // 3. 立即从当前前端视图中移除
+                    // 4. 立即从当前前端视图中移除
                     if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
                         historyList.value.splice(index, 1);
                     } else {
-                        historyList.value = historyList.value.filter(i => (i._id !== realId && i.id !== realId));
+                        historyList.value = historyList.value.filter(i => {
+                            const fp = `${i.data?.app_name || ''}_${i.data?.title || ''}_${i.data?.summary || ''}`.trim();
+                            return fp !== contentFingerprint;
+                        });
                     }
 
-                    // 4. 更新统计并重置缓存
+                    // 5. 更新统计并重置缓存
                     await fetchStats();
                     aggResult.value = null;
                     setTimeout(() => lucide.createIcons(), 50);
