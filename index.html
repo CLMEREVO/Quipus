@@ -628,15 +628,13 @@
                         } catch (e) {}
                     }
 
-                    // 2. 尝试调用后端单条删除接口
+                    // 2. 尝试异步通知后端删除（不阻塞前端，失败也无所谓，反正本地已经封杀）
                     let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
                     if (realId) {
-                        try {
-                            await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' });
-                        } catch (e) {}
+                        fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' }).catch(() => {});
                     }
 
-                    // 3. 从当前视图中安全移除
+                    // 3. 核心：直接在当前内存数组中彻底剔除该卡片，绝不重新请求后端接口！
                     if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
                         historyList.value.splice(index, 1);
                     } else {
@@ -646,18 +644,15 @@
                         });
                     }
 
-                    // 4. 关键：同步刷新分类计数器与统计看板！
+                    // 4. 同步更新顶部统计看板数字（不重新拉取列表，只更新统计）
                     if (typeof fetchStats === 'function') {
-                        await fetchStats();
+                        await fetchStats().catch(() => {});
                     }
 
-                    // 5. 关键：清空全局聚合摘要缓存，确保聚合摘要中的计数器也实时重算！
+                    // 5. 重置全局聚合摘要缓存，使其重新计算
                     aggResult.value = null;
 
-                    // 6. 重新拉取一次历史，确保全链路状态同步
-                    await fetchHistory();
-
-                    // 7. 重新渲染图标
+                    // 6. 重新渲染图标
                     setTimeout(() => lucide.createIcons(), 50);
                 };
 
