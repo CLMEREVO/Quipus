@@ -221,8 +221,8 @@
                                     <span class="text-xs px-2 py-0.5 rounded font-medium"
                                         :class="{
                                             'bg-amber-100 text-amber-800': item.data.category === '重要/紧急待办',
-                                            'bg-blue-100 text-blue-800': item.data.category === '其他类' || item.data.category === '物流与消费',
-                                            'bg-rose-100 text-rose-800': item.data.category === '无效广告/促销'
+                                            'bg-blue-100 text-blue-800': item.data.category === '其他类' || item.data.category === '其他类消息' || item.data.category === '物流与消费',
+                                            'bg-rose-100 text-rose-800': item.data.category === '无效广告/促销' || item.data.category === '拦截类消息'
                                         }">
                                         {{ item.data.category }}
                                     </span>
@@ -398,12 +398,18 @@
                             groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合多源物流通知。`;
                             groups[key].lastTime = item.created_at;
                         }
-                        // 3. 拦截类处理
+                        // 3. 拦截类处理（动态读取被拦截消息的内容，拒绝死板！）
                         else if (isBlocked) {
                             groups[key].businessCount = groups[key].count;
-                            groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
+                            // 如果是淘宝京东等营销，显示营销折叠；如果是其他自定义拦截，动态展示其摘要
+                            const rawSummary = item.data.summary || '';
+                            if (rawSummary.includes('营销') || rawSummary.includes('促销') || rawSummary.includes('优惠') || rawSummary.includes('京东') || rawSummary.includes('淘宝')) {
+                                groups[key].lastSummary = '来自淘宝、京东、拼多多等平台的促销优惠与营销通知，已为您自动折叠拦截。';
+                            } else {
+                                groups[key].lastSummary = `[自定义策略拦截] ${rawSummary}`;
+                            }
                             groups[key].lastTime = item.created_at;
-                        } 
+                        }
                         // 4. 其他常规类（作业、停水等——保留动态覆盖最新摘要的功能）
                         else {
                             groups[key].businessCount = groups[key].count;
@@ -428,15 +434,22 @@
                 const fetchHistory = async () => {
                     fetchingHistory.value = true;
                     try {
-                        const targetTab = currentTab.value === 'express' ? 'overview' : currentTab.value;
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${targetTab}&limit=500`);
+                        let tabParam = currentTab.value === 'express' ? 'overview' : currentTab.value;
+                        if (tabParam === 'other') tabParam = 'other'; // 确保参数正确
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${tabParam}&limit=500`);
                         const json = await res.json();
-                        if (json.status === 'success') historyList.value = json.items;
+                        if (json.status === 'success') {
+                            // 前端做一层双保险过滤：如果在 “other” 标签下，把包含 “其他类” 或 “其他类消息” 的都放进来
+                            if (currentTab.value === 'other') {
+                                historyList.value = json.items.filter(i => i.data.category === '其他类' || i.data.category === '其他类消息' || i.data.category === '物流与消费');
+                            } else {
+                                historyList.value = json.items;
+                            }
+                        }
                     } catch (e) { 
                         console.error('拉取历史失败', e); 
                     } finally { 
                         fetchingHistory.value = false; 
-                        // 核心修复：确保每次历史列表加载完成后，立刻渲染 Lucide 图标！
                         setTimeout(() => lucide.createIcons(), 50); 
                     }
                 };
