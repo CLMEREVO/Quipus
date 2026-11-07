@@ -66,7 +66,7 @@ def apply_custom_rules(app_name: str, raw_text: str, result: dict[str, Any]) -> 
             if app_matched and text_matched:
                 result["category"] = r["target_cat"]
                 result["is_urgent"] = bool(r["is_urgent"])
-                result["summary"] = f"[用户自定义规则命中] {result.get('summary', '')}"
+                result["summary"] = f"[自定义] {result.get('summary', '')}"
                 break
     return result
 

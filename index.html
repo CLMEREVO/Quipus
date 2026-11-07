@@ -434,27 +434,34 @@
                 const fetchHistory = async () => {
                     fetchingHistory.value = true;
                     try {
-                        let tabParam = currentTab.value === 'express' ? 'overview' : currentTab.value;
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=${tabParam}&limit=500`);
+                        // 核心修改：无论切换到哪个标签，统一请求全部数据（tab=overview），彻底摆脱后端不同分类参数不一致的限制！
+                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000`);
                         const json = await res.json();
-                        if (json.status === 'success') {
-                            // 对所有历史数据的分类名称进行前端规范化映射，彻底解决“其他类消息”与“其他类”不统一的问题
-                            let items = json.items.map(item => {
+                        
+                        if (json.status === 'success' && json.items) {
+                            // 1. 数据规范化：将所有类型的“其他类”统一映射为标准的 “其他类”
+                            let allItems = json.items.map(item => {
                                 if (item.data && item.data.category) {
-                                    if (item.data.category === '其他类消息' || item.data.category === '物流与消费') {
+                                    if (item.data.category === '其他类消息' || item.data.category === '物流与消费' || item.data.category === 'other') {
                                         item.data.category = '其他类';
                                     }
                                 }
                                 return item;
                             });
 
-                            // 如果当前在 “other” 标签页，确保把所有“其他类”的通知精准过滤并呈现出来
-                            if (currentTab.value === 'other') {
-                                historyList.value = items.filter(i => i.data.category === '其他类');
-                            } else if (currentTab.value === 'overview') {
-                                historyList.value = items;
+                            // 2. 根据当前选中的 Tab 在前端本地进行精准过滤
+                            const tab = currentTab.value;
+                            if (tab === 'overview' || tab === 'express') {
+                                historyList.value = allItems;
+                            } else if (tab === 'urgent') {
+                                historyList.value = allItems.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
+                            } else if (tab === 'other') {
+                                // 精准捕获所有属于“其他类”的消息（包括手动清洗和自定义重定向的）
+                                historyList.value = allItems.filter(i => i.data.category === '其他类');
+                            } else if (tab === 'blocked') {
+                                historyList.value = allItems.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
                             } else {
-                                historyList.value = items;
+                                historyList.value = allItems;
                             }
                         }
                     } catch (e) { 
