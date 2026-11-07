@@ -612,13 +612,12 @@
                 };
 
                 const deleteNotification = async (item, index) => {
-                    // 1. 提取内容指纹作为唯一身份证
+                    // 1. 提取内容指纹作为唯一身份证，写入本地黑名单
                     const appName = item.data?.app_name || '';
                     const title = item.data?.title || '';
                     const summary = item.data?.summary || '';
                     const contentFingerprint = `${appName}_${title}_${summary}`.trim();
 
-                    // 2. 写入浏览器的删除黑名单
                     if (contentFingerprint && contentFingerprint !== '__') {
                         try {
                             let deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
@@ -629,7 +628,7 @@
                         } catch (e) {}
                     }
 
-                    // 3. 尝试调用后端单条删除接口
+                    // 2. 尝试调用后端单条删除接口
                     let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
                     if (realId) {
                         try {
@@ -637,7 +636,7 @@
                         } catch (e) {}
                     }
 
-                    // 4. 从当前视图中安全移除
+                    // 3. 从当前视图中安全移除
                     if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
                         historyList.value.splice(index, 1);
                     } else {
@@ -647,8 +646,18 @@
                         });
                     }
 
-                    await fetchStats();
+                    // 4. 关键：同步刷新分类计数器与统计看板！
+                    if (typeof fetchStats === 'function') {
+                        await fetchStats();
+                    }
+
+                    // 5. 关键：清空全局聚合摘要缓存，确保聚合摘要中的计数器也实时重算！
                     aggResult.value = null;
+
+                    // 6. 重新拉取一次历史，确保全链路状态同步
+                    await fetchHistory();
+
+                    // 7. 重新渲染图标
                     setTimeout(() => lucide.createIcons(), 50);
                 };
 
