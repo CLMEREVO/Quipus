@@ -525,17 +525,16 @@
                                 direction: pay.direction,
                                 ts: toTs(item.created_at),
                                 time: toHHMM(item.created_at),
-                                raw: (item.original || '').trim(),
                                 apps: [item.data.app_name || '未知来源'],
                             };
-                            // 同一笔的三个判据：
-                            //   ① 同向 + 同额 + 间隔 < 5 秒（多源推送到达时间差）
-                            //   ② 原文完全相同且在 10 分钟内（同一条消息被重复导入）
+                            // 同一笔的唯一判据：同向 + 同额 + 5 秒内 + 来源不同。
+                            // 同一 App 的多次推送、或同一段文字再次提交，一律算多笔
+                            //（微信支付这类极简通知正文可以完全相同，不能拿原文当去重依据）。
                             const dup = groups[key].txns.find(
-                                (t) => (t.direction === txn.direction
-                                        && Math.abs(t.amount - txn.amount) < 0.005
-                                        && Math.abs(t.ts - txn.ts) < PAY_DEDUPE_MS)
-                                    || (txn.raw && t.raw === txn.raw && Math.abs(t.ts - txn.ts) < 600000)
+                                (t) => t.direction === txn.direction
+                                    && Math.abs(t.amount - txn.amount) < 0.005
+                                    && Math.abs(t.ts - txn.ts) < PAY_DEDUPE_MS
+                                    && !t.apps.includes(txn.apps[0])
                             );
                             if (dup) {
                                 if (!dup.apps.includes(txn.apps[0])) dup.apps.push(txn.apps[0]);
