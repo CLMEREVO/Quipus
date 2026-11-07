@@ -434,12 +434,16 @@
                 const fetchHistory = async () => {
                     fetchingHistory.value = true;
                     try {
-                        // 核心修改：无论切换到哪个标签，统一请求全部数据（tab=overview），彻底摆脱后端不同分类参数不一致的限制！
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000`);
                         const json = await res.json();
                         
                         if (json.status === 'success' && json.items) {
-                            // 1. 数据规范化：将所有类型的“其他类”统一映射为标准的 “其他类”
+                            // 获取本地已被删除的 ID 列表（黑名单）
+                            let deletedIds = [];
+                            try {
+                                deletedIds = JSON.parse(localStorage.getItem('quipus_deleted_ids') || '[]');
+                            } catch (e) {}
+
                             let allItems = json.items.map(item => {
                                 if (item.data && item.data.category) {
                                     if (item.data.category === '其他类消息' || item.data.category === '物流与消费' || item.data.category === 'other') {
@@ -449,14 +453,19 @@
                                 return item;
                             });
 
-                            // 2. 根据当前选中的 Tab 在前端本地进行精准过滤
+                            // 核心：过滤掉所有在黑名单中的已删除记录！
+                            allItems = allItems.filter(item => {
+                                const id = item._id || item.id || item.notification_id || (item.data && item.data._id);
+                                return !id || !deletedIds.includes(id);
+                            });
+
+                            // 按当前 Tab 本地过滤
                             const tab = currentTab.value;
                             if (tab === 'overview' || tab === 'express') {
                                 historyList.value = allItems;
                             } else if (tab === 'urgent') {
                                 historyList.value = allItems.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
                             } else if (tab === 'other') {
-                                // 精准捕获所有属于“其他类”的消息（包括手动清洗和自定义重定向的）
                                 historyList.value = allItems.filter(i => i.data.category === '其他类');
                             } else if (tab === 'blocked') {
                                 historyList.value = allItems.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
@@ -591,75 +600,43 @@
                 };
 
                 const deleteNotification = async (item, index) => {
-                    // 全方位深度提取 ID（兼容 _id, id, 以及后端可能序列化出来的各种键名）
-                    let realId = null;
-                    if (item) {
-                        realId = item._id || item.id || item.notification_id || (item.data && item.data._id) || (item.data && item.data.id);
-                        // 如果还是没找到，尝试在对象的所有键里找带有 id 或 _id 的值
-                        if (!realId) {
-                            for (let key in item) {
-                                if (key.toLowerCase().includes('id') && item[key]) {
-                                    realId = item[key];
-                                    break;
-                                }
+                    let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
+                    
+                    // 1. 无论后端删没删成功，首先写入浏览器的本地删除黑名单（localStorage）
+                    if (realId) {
+                        try {
+                            let deletedIds = JSON.parse(localStorage.getItem('quipus_deleted_ids') || '[]');
+                            if (!deletedIds.includes(realId)) {
+                                deletedIds.push(realId);
+                                localStorage.setItem('quipus_deleted_ids', JSON.stringify(deletedIds));
                             }
+                        } catch (err) {
+                            console.warn("本地存储写入失败", err);
                         }
                     }
 
-                    // 如果实在找不到真实 ID，为了不卡死前端测试，直接走前端本地从视图中移除并同步状态的兜底
-                    if (!realId) {
-                        console.warn("未能从对象中提取到数据库 ID，已自动启用前端本地直接删除兜底：", item);
-                        if (typeof index === 'number' && index >= 0) {
-                            historyList.value.splice(index, 1);
-                        } else {
-                            historyList.value = historyList.value.filter(i => i !== item);
+                    // 2. 尝试调用后端删除接口
+                    if (realId) {
+                        try {
+                            await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
+                                method: 'DELETE'
+                            });
+                        } catch (e) {
+                            console.warn("后端删除接口调用异常，已由本地黑名单兜底", e);
                         }
-                        await fetchStats();
-                        aggResult.value = null;
-                        setTimeout(() => lucide.createIcons(), 50);
-                        return;
                     }
 
-                    try {
-                        // 向后端发送真实的 DELETE 请求
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
-                            method: 'DELETE'
-                        });
-                        const json = await res.json().catch(() => ({}));
-
-                        if (res.ok || json.status === 'success') {
-                            // 从当前前端视图列表中移除
-                            if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
-                                historyList.value.splice(index, 1);
-                            } else {
-                                historyList.value = historyList.value.filter(i => (i._id !== realId && i.id !== realId));
-                            }
-
-                            // 实时同步更新顶部统计看板
-                            await fetchStats();
-                            
-                            // 重置全局聚合摘要缓存
-                            aggResult.value = null;
-
-                            // 重新渲染图标
-                            setTimeout(() => lucide.createIcons(), 50);
-                        } else {
-                            // 后端接口若提示删除失败，前端也做本地安全移除，确保不影响测试
-                            if (typeof index === 'number' && index >= 0) {
-                                historyList.value.splice(index, 1);
-                            }
-                            await fetchStats();
-                            aggResult.value = null;
-                        }
-                    } catch (e) {
-                        console.error('删除请求异常:', e);
-                        // 网络异常时的本地兜底移除
-                        if (typeof index === 'number' && index >= 0) {
-                            historyList.value.splice(index, 1);
-                        }
-                        await fetchStats();
-                        aggResult.value = null;
+                    // 3. 立即从当前前端视图中移除
+                    if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
+                        historyList.value.splice(index, 1);
+                    } else {
+                        historyList.value = historyList.value.filter(i => (i._id !== realId && i.id !== realId));
                     }
+
+                    // 4. 更新统计并重置缓存
+                    await fetchStats();
+                    aggResult.value = null;
+                    setTimeout(() => lucide.createIcons(), 50);
                 };
 
                 const refreshSeedData = async () => {
