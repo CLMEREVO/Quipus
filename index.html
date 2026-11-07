@@ -437,9 +437,14 @@
                         const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000`);
                         const json = await res.json();
                         
-                        let allItems = [];
                         if (json.status === 'success' && json.items) {
-                            allItems = json.items.map(item => {
+                            // 获取本地已被删除的内容指纹黑名单
+                            let deletedFingerprints = [];
+                            try {
+                                deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
+                            } catch (e) {}
+
+                            let allItems = json.items.map(item => {
                                 if (item.data && item.data.category) {
                                     if (item.data.category === '其他类消息' || item.data.category === '物流与消费' || item.data.category === 'other') {
                                         item.data.category = '其他类';
@@ -447,54 +452,32 @@
                                 }
                                 return item;
                             });
-                        }
 
-                        // 获取本地手动维护的“存活列表缓存”
-                        let cachedLiveItems = [];
-                        try {
-                            const localCache = localStorage.getItem('quipus_live_history');
-                            if (localCache) {
-                                cachedLiveItems = JSON.parse(localCache);
-                            }
-                        } catch (e) {}
-
-                        // 如果本地有缓存，并且云端返回的数据和本地缓存条数不一样（说明有删除动作），以本地缓存为准！或者我们做合并。
-                        // 这里我们采用最暴力的策略：只要本地缓存存在，我们就用本地缓存，但把云端新清洗进来的新通知自动追加进去！
-                        if (cachedLiveItems.length > 0) {
-                            // 找出云端有但本地缓存里没有的新通知（比如刚刚点击“智能清洗”产生的新通知）
-                            const existingFingerprints = cachedLiveItems.map(i => `${i.data?.app_name}_${i.data?.title}_${i.data?.summary}`);
-                            const brandNewItems = allItems.filter(i => {
-                                const fp = `${i.data?.app_name}_${i.data?.title}_${i.data?.summary}`;
-                                return !existingFingerprints.includes(fp);
+                            // 核心：基于“内容指纹”过滤掉所有被用户删除过的通知！
+                            allItems = allItems.filter(item => {
+                                const appName = item.data?.app_name || '';
+                                const title = item.data?.title || '';
+                                const summary = item.data?.summary || '';
+                                const fp = `${appName}_${title}_${summary}`.trim();
+                                return !deletedFingerprints.includes(fp);
                             });
-                            
-                            // 最终列表 = 本地存活的 + 云端刚清洗的新通知
-                            allItems = [...brandNewItems, ...cachedLiveItems];
+
+                            // 按当前 Tab 本地过滤
+                            const tab = currentTab.value;
+                            if (tab === 'overview' || tab === 'express') {
+                                historyList.value = allItems;
+                            } else if (tab === 'urgent') {
+                                historyList.value = allItems.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
+                            } else if (tab === 'other') {
+                                historyList.value = allItems.filter(i => i.data.category === '其他类');
+                            } else if (tab === 'blocked') {
+                                historyList.value = allItems.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
+                            } else {
+                                historyList.value = allItems;
+                            }
                         }
-
-                        // 按当前 Tab 本地过滤渲染
-                        const tab = currentTab.value;
-                        if (tab === 'overview' || tab === 'express') {
-                            historyList.value = allItems;
-                        } else if (tab === 'urgent') {
-                            historyList.value = allItems.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
-                        } else if (tab === 'other') {
-                            historyList.value = allItems.filter(i => i.data.category === '其他类');
-                        } else if (tab === 'blocked') {
-                            historyList.value = allItems.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
-                        } else {
-                            historyList.value = allItems;
-                        }
-
-                        // 同步更新本地存活缓存
-                        localStorage.setItem('quipus_live_history', JSON.stringify(allItems));
-
                     } catch (e) { 
-                        console.error('拉取历史失败，启用本地缓存兜底', e);
-                        try {
-                            const localCache = localStorage.getItem('quipus_live_history');
-                            if (localCache) historyList.value = JSON.parse(localCache);
-                        } catch (err) {}
+                        console.error('拉取历史失败', e); 
                     } finally { 
                         fetchingHistory.value = false; 
                         setTimeout(() => lucide.createIcons(), 50); 
@@ -620,31 +603,48 @@
                 };
 
                 const deleteNotification = async (item, index) => {
-                    // 1. 尝试调用后端删除接口
+                    // 1. 提取或生成该条通知的唯一“内容指纹”（App + 标题 + 摘要）
+                    const appName = item.data?.app_name || '';
+                    const title = item.data?.title || '';
+                    const summary = item.data?.summary || '';
+                    const contentFingerprint = `${appName}_${title}_${summary}`.trim();
+
+                    // 2. 将指纹存入浏览器的本地黑名单（localStorage）
+                    if (contentFingerprint && contentFingerprint !== '__') {
+                        try {
+                            let deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
+                            if (!deletedFingerprints.includes(contentFingerprint)) {
+                                deletedFingerprints.push(contentFingerprint);
+                                localStorage.setItem('quipus_deleted_fingerprints', JSON.stringify(deletedFingerprints));
+                            }
+                        } catch (err) {
+                            console.warn("本地指纹写入失败", err);
+                        }
+                    }
+
+                    // 3. 尝试调用后端删除接口（用真实的 id）
                     let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
                     if (realId) {
                         try {
                             await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
                                 method: 'DELETE'
                             });
-                        } catch (e) {}
+                        } catch (e) {
+                            console.warn("后端删除接口调用异常，已由本地指纹黑名单兜底", e);
+                        }
                     }
 
-                    // 2. 直接从当前的响应式数组中精准切除
-                    const targetFp = `${item.data?.app_name || ''}_${item.data?.title || ''}_${item.data?.summary || ''}`;
-                    
-                    historyList.value = historyList.value.filter(i => {
-                        const fp = `${i.data?.app_name || ''}_${i.data?.title || ''}_${i.data?.summary || ''}`;
-                        const id = i._id || i.id || i.notification_id || (i.data && i.data._id);
-                        return fp !== targetFp && (!realId || id !== realId);
-                    });
+                    // 4. 立即从当前前端视图中移除
+                    if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
+                        historyList.value.splice(index, 1);
+                    } else {
+                        historyList.value = historyList.value.filter(i => {
+                            const fp = `${i.data?.app_name || ''}_${i.data?.title || ''}_${i.data?.summary || ''}`.trim();
+                            return fp !== contentFingerprint;
+                        });
+                    }
 
-                    // 3. 强行把更新后的“存活列表”写入 localStorage 缓存！
-                    try {
-                        localStorage.setItem('quipus_live_history', JSON.stringify(historyList.value));
-                    } catch (e) {}
-
-                    // 4. 更新统计并重置聚合缓存
+                    // 5. 更新统计并重置缓存
                     await fetchStats();
                     aggResult.value = null;
                     setTimeout(() => lucide.createIcons(), 50);
