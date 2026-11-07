@@ -438,7 +438,7 @@
                         const json = await res.json();
                         
                         if (json.status === 'success' && json.items) {
-                            // 获取本地已被删除的内容指纹黑名单
+                            // 获取本地黑名单
                             let deletedFingerprints = [];
                             try {
                                 deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
@@ -453,7 +453,7 @@
                                 return item;
                             });
 
-                            // 核心：基于“内容指纹”过滤掉所有被用户删除过的通知！
+                            // 核心：在渲染前，用黑名单过滤掉所有被删除过的项！
                             allItems = allItems.filter(item => {
                                 const appName = item.data?.app_name || '';
                                 const title = item.data?.title || '';
@@ -462,7 +462,7 @@
                                 return !deletedFingerprints.includes(fp);
                             });
 
-                            // 按当前 Tab 本地过滤
+                            // 按当前 Tab 本地渲染过滤
                             const tab = currentTab.value;
                             if (tab === 'overview' || tab === 'express') {
                                 historyList.value = allItems;
@@ -594,7 +594,16 @@
 
                 const clearHistory = async () => {
                     if (!confirm('确定清空所有历史通知吗？')) return;
-                    await fetch('https://quipus-production.up.railway.app/api/history', { method: 'DELETE' });
+                    
+                    try {
+                        await fetch('https://quipus-production.up.railway.app/api/history', { method: 'DELETE' });
+                    } catch (e) {}
+
+                    // 彻底清除本地黑名单，让系统恢复绝对干净的状态
+                    try {
+                        localStorage.removeItem('quipus_deleted_fingerprints');
+                    } catch (e) {}
+
                     historyList.value = [];
                     aggResult.value = null;
                     readTabs.value.clear();
@@ -603,13 +612,13 @@
                 };
 
                 const deleteNotification = async (item, index) => {
-                    // 1. 提取或生成该条通知的唯一“内容指纹”（App + 标题 + 摘要）
+                    // 1. 提取内容指纹作为唯一身份证
                     const appName = item.data?.app_name || '';
                     const title = item.data?.title || '';
                     const summary = item.data?.summary || '';
                     const contentFingerprint = `${appName}_${title}_${summary}`.trim();
 
-                    // 2. 将指纹存入浏览器的本地黑名单（localStorage）
+                    // 2. 写入浏览器的删除黑名单
                     if (contentFingerprint && contentFingerprint !== '__') {
                         try {
                             let deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
@@ -617,24 +626,18 @@
                                 deletedFingerprints.push(contentFingerprint);
                                 localStorage.setItem('quipus_deleted_fingerprints', JSON.stringify(deletedFingerprints));
                             }
-                        } catch (err) {
-                            console.warn("本地指纹写入失败", err);
-                        }
+                        } catch (e) {}
                     }
 
-                    // 3. 尝试调用后端删除接口（用真实的 id）
+                    // 3. 尝试调用后端单条删除接口
                     let realId = item._id || item.id || item.notification_id || (item.data && item.data._id);
                     if (realId) {
                         try {
-                            await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, {
-                                method: 'DELETE'
-                            });
-                        } catch (e) {
-                            console.warn("后端删除接口调用异常，已由本地指纹黑名单兜底", e);
-                        }
+                            await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' });
+                        } catch (e) {}
                     }
 
-                    // 4. 立即从当前前端视图中移除
+                    // 4. 从当前视图中安全移除
                     if (typeof index === 'number' && index >= 0 && index < historyList.value.length) {
                         historyList.value.splice(index, 1);
                     } else {
@@ -644,7 +647,6 @@
                         });
                     }
 
-                    // 5. 更新统计并重置缓存
                     await fetchStats();
                     aggResult.value = null;
                     setTimeout(() => lucide.createIcons(), 50);
