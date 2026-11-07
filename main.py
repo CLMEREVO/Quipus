@@ -12,6 +12,7 @@ from seed import seed_if_empty, force_seed_samples
 from storage import (
     TAB_TO_CATEGORY,
     clear,
+    delete_notification,
     list_notifications,
     save_notification,
     stats,
@@ -54,7 +55,12 @@ class NotificationRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
 class AggregateRequest(BaseModel):
-    notifications: list[str] = Field(..., min_length=1)
+    # 兼容两种字段名：新的 notifications，旧的 texts（前端历史版本用过）
+    notifications: list[str] = Field(default_factory=list)
+    texts: list[str] = Field(default_factory=list)
+
+    def resolved_items(self) -> list[str]:
+        return self.notifications or self.texts
 
 class RuleRequest(BaseModel):
     app_keyword: str = ""
@@ -77,10 +83,13 @@ def clean_one(data: NotificationRequest):
 
 @app.post("/api/aggregate")
 def aggregate(data: AggregateRequest):
+    items = data.resolved_items()
+    if not items:
+        raise HTTPException(status_code=422, detail="notifications 不能为空")
     if aggregate_notifications is None:
         raise HTTPException(status_code=503, detail="聚合函数不可用")
     try:
-        merged = aggregate_notifications(data.notifications)
+        merged = aggregate_notifications(items)
         if not isinstance(merged, dict):
             merged = {}
         normalized_result = {
@@ -91,7 +100,7 @@ def aggregate(data: AggregateRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"聚合失败: {exc}") from exc
 
-    return {"status": "success", "source_count": len(data.notifications), "aggregated_result": normalized_result}
+    return {"status": "success", "source_count": len(items), "aggregated_result": normalized_result}
 
 @app.get("/api/history")
 def get_history(tab: str = Query("overview"), limit: int = Query(200, ge=1, le=1000), q: str | None = Query(None)):
@@ -110,7 +119,11 @@ def delete_history():
 
 @app.delete("/api/history/{item_id}")
 def delete_one(item_id: int):
-    removed = delete_notification(item_id)
+    try:
+        removed = delete_notification(item_id)
+    except Exception as exc:
+        logger.exception("删除通知 id=%s 失败", item_id)
+        raise HTTPException(status_code=500, detail=f"删除失败：{type(exc).__name__}: {exc}") from exc
     if not removed:
         raise HTTPException(status_code=404, detail="通知不存在或已被删除")
     return {"status": "success", "deleted_id": item_id}    

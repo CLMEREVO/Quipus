@@ -247,6 +247,12 @@
 
     <script>
         const { createApp, ref, computed, onMounted, watch } = Vue;
+
+        // 后端地址：本地打开/本地起服务时自动走 127.0.0.1，线上（GitHub Pages）走 Railway。
+        const API_BASE = (location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname))
+            ? 'http://127.0.0.1:8000'
+            : 'https://quipus-production.up.railway.app';
+
         createApp({
             setup() {
                 const currentTab = ref('overview');
@@ -425,7 +431,7 @@
 
                 const fetchStats = async () => {
                     try {
-                        const res = await fetch('https://quipus-production.up.railway.app/api/stats');
+                        const res = await fetch(`${API_BASE}/api/stats`);
                         const json = await res.json();
                         if (json.status === 'success') stats.value = json;
                     } catch (e) { console.error('获取统计失败', e); }
@@ -434,32 +440,17 @@
                 const fetchHistory = async () => {
                     fetchingHistory.value = true;
                     try {
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000`);
+                        const res = await fetch(`${API_BASE}/api/history?tab=overview&limit=1000`);
                         const json = await res.json();
                         
                         if (json.status === 'success' && json.items) {
-                            // 获取本地黑名单
-                            let deletedFingerprints = [];
-                            try {
-                                deletedFingerprints = JSON.parse(localStorage.getItem('quipus_deleted_fingerprints') || '[]');
-                            } catch (e) {}
-
-                            let allItems = json.items.map(item => {
+                            const allItems = json.items.map(item => {
                                 if (item.data && item.data.category) {
                                     if (item.data.category === '其他类消息' || item.data.category === '物流与消费' || item.data.category === 'other') {
                                         item.data.category = '其他类';
                                     }
                                 }
                                 return item;
-                            });
-
-                            // 核心：在渲染前，用黑名单过滤掉所有被删除过的项！
-                            allItems = allItems.filter(item => {
-                                const appName = item.data?.app_name || '';
-                                const title = item.data?.title || '';
-                                const summary = item.data?.summary || '';
-                                const fp = `${appName}_${title}_${summary}`.trim();
-                                return !deletedFingerprints.includes(fp);
                             });
 
                             // 按当前 Tab 本地渲染过滤
@@ -486,7 +477,7 @@
 
                 const fetchRules = async () => {
                     try {
-                        const res = await fetch('https://quipus-production.up.railway.app/api/rules');
+                        const res = await fetch(`${API_BASE}/api/rules`);
                         const json = await res.json();
                         if (json.status === 'success') ruleList.value = json.rules;
                     } catch (e) { console.error('获取规则失败', e); }
@@ -495,7 +486,7 @@
                 const addRule = async () => {
                     if (!newRule.value.keyword.trim()) { alert('关键词不能为空！'); return; }
                     try {
-                        await fetch('https://quipus-production.up.railway.app/api/rules', {
+                        await fetch(`${API_BASE}/api/rules`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -511,13 +502,13 @@
                 };
 
                 const deleteRule = async (id) => {
-                    await fetch(`https://quipus-production.up.railway.app/api/rules/${id}`, { method: 'DELETE' });
+                    await fetch(`${API_BASE}/api/rules/${id}`, { method: 'DELETE' });
                     fetchRules();
                 };
 
                 const resetRules = async () => {
                     if (!confirm('确定要恢复默认设置并清空所有自定义规则吗？')) return;
-                    await fetch('https://quipus-production.up.railway.app/api/rules/reset', { method: 'POST' });
+                    await fetch(`${API_BASE}/api/rules/reset`, { method: 'POST' });
                     fetchRules();
                     alert('已恢复默认设置！');
                 };
@@ -536,7 +527,7 @@
                     if (!inputText.value.trim()) return;
                     loading.value = true;
                     try {
-                        const res = await fetch('https://quipus-production.up.railway.app/api/clean', {
+                        const res = await fetch(`${API_BASE}/api/clean`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text: inputText.value })
@@ -596,12 +587,7 @@
                     if (!confirm('确定清空所有历史通知吗？')) return;
                     
                     try {
-                        await fetch('https://quipus-production.up.railway.app/api/history', { method: 'DELETE' });
-                    } catch (e) {}
-
-                    // 彻底清除本地黑名单，让系统恢复绝对干净的状态
-                    try {
-                        localStorage.removeItem('quipus_deleted_fingerprints');
+                        await fetch(`${API_BASE}/api/history`, { method: 'DELETE' });
                     } catch (e) {}
 
                     historyList.value = [];
@@ -623,8 +609,11 @@
 
                     // 2. 真删：调后端 DELETE /api/history/{id}，把数据库里那条记录删掉
                     try {
-                        const res = await fetch(`https://quipus-production.up.railway.app/api/history/${realId}`, { method: 'DELETE' });
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        const res = await fetch(`${API_BASE}/api/history/${realId}`, { method: 'DELETE' });
+                        if (!res.ok) {
+                            const body = await res.json().catch(() => ({}));
+                            throw new Error(body.detail ? `${res.status} · ${body.detail}` : `HTTP ${res.status}`);
+                        }
                     } catch (e) {
                         // 3. 删除失败就回滚到服务端真实状态，绝不假装删成功
                         alert('删除失败：' + e.message + '，已恢复列表');
@@ -639,7 +628,7 @@
 
                 const refreshSeedData = async () => {
                     try {
-                        const res = await fetch('https://quipus-production.up.railway.app/api/seed/refresh', { method: 'POST' });
+                        const res = await fetch(`${API_BASE}/api/seed/refresh`, { method: 'POST' });
                         const json = await res.json();
                         if (json.status === 'success') {
                             await fetchHistory();
@@ -657,7 +646,7 @@
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        const resAll = await fetch('https://quipus-production.up.railway.app/api/history?tab=overview&limit=1000');
+                        const resAll = await fetch(`${API_BASE}/api/history?tab=overview&limit=1000`);
                         const jsonAll = await resAll.json();
                         const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
 
@@ -709,10 +698,10 @@
                         let apiSummary = "";
                         let apiTitle = "多源通知智能聚合";
                         try {
-                            const res = await fetch("https://quipus-production.up.railway.app/api/aggregate", {
+                            const res = await fetch(`${API_BASE}/api/aggregate`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ texts: realTexts })
+                                body: JSON.stringify({ notifications: realTexts })
                             });
                             const json = await res.json();
                             console.log("后端聚合接口返回原始数据：", json); // F12 控制台可查
