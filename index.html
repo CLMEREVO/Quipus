@@ -222,6 +222,21 @@
                                         共 {{ group.businessCount }} 件<template v-if="group.mergedCount > 0"> · 去重 {{ group.mergedCount }} 条</template>
                                     </span>
                                 </div>
+
+                                <div class="flex items-center gap-2 flex-wrap text-[10px]">
+                                    <button @click.stop="setExpressCount()" class="text-slate-400 hover:text-indigo-600">修正件数</button>
+                                    <template v-if="group.locked">
+                                        <span class="text-amber-600">已锁定为 {{ group.manualCount }} 件</span>
+                                        <button @click.stop="unlockExpress()" class="text-slate-400 hover:text-rose-600">解除锁定</button>
+                                    </template>
+                                </div>
+
+                                <div v-if="group.mismatch"
+                                     class="flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-[10px] text-amber-800">
+                                    <span>系统统计已变为 {{ group.systemCount }} 件</span>
+                                    <button @click.stop="adoptSystemCount(group)" class="px-2 py-0.5 bg-amber-600 text-white rounded">采用系统值</button>
+                                    <button @click.stop="unlockExpress()" class="px-2 py-0.5 bg-white border border-amber-300 rounded">解除锁定</button>
+                                </div>
                                 <div v-if="group.parcels.length" class="rounded-lg bg-white/60 divide-y divide-indigo-100">
                                     <div v-for="(p, i) in group.parcels.slice(0, 4)" :key="i" class="flex items-center gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
                                         <span class="shrink-0 font-bold text-slate-800 tabular-nums">{{ p.code || '待出码' }}</span>
@@ -528,6 +543,40 @@
                     const s = expandedBlocked.value;
                     if (s.has(key)) s.delete(key);
                     else s.add(key);
+                };
+
+                // 快递手动件数：锁定后用 localStorage 记，系统件数变化时提示用户确认
+                const MANUAL_EXPRESS_KEY = 'quipus_manual_express';
+                const manualExpress = ref((() => {
+                    try {
+                        const v = JSON.parse(localStorage.getItem(MANUAL_EXPRESS_KEY) || 'null');
+                        return v && v.count > 0 ? v : null;
+                    } catch (e) {
+                        return null;
+                    }
+                })());
+                const saveManualExpress = (v) => {
+                    manualExpress.value = v;
+                    try {
+                        if (v) localStorage.setItem(MANUAL_EXPRESS_KEY, JSON.stringify(v));
+                        else localStorage.removeItem(MANUAL_EXPRESS_KEY);
+                    } catch (e) { /* 隐私模式写入失败时忽略 */ }
+                };
+                const setExpressCount = () => {
+                    const cur = manualExpress.value ? manualExpress.value.count : '';
+                    const raw = prompt('当前待取件数（输入 0 = 清零并解除锁定）', String(cur));
+                    if (raw === null) return;
+                    const n = parseInt(raw, 10);
+                    if (Number.isNaN(n) || n < 0) {
+                        alert('请输入 0 或正整数');
+                        return;
+                    }
+                    saveManualExpress(n > 0 ? { count: n, ts: Date.now() } : null);
+                };
+                const unlockExpress = () => saveManualExpress(null);
+                const adoptSystemCount = (group) => {
+                    const n = group.systemCount || 0;
+                    saveManualExpress(n > 0 ? { count: n, ts: Date.now() } : null);
                 };
 
                 // 聚合体看板里"标记已读"（= 删除这条通知）
@@ -1054,11 +1103,21 @@
                             }
                         }
                         g.parcels = parcels;
-                        g.businessCount = pending;
+                        g.systemCount = pending;
+                        // 手动锁定的件数优先显示；系统件数变化时由用户决定是否采用
+                        let display = pending;
+                        const manual = manualExpress.value;
+                        if (manual && manual.count > 0) {
+                            display = manual.count;
+                            g.manualCount = manual.count;
+                            g.locked = true;
+                            g.mismatch = pending !== manual.count;
+                        }
+                        g.businessCount = display;
                         g.mergedCount = merged;
                         g.stationCount = station;
                         const codes = parcels.map((p) => p.code).filter(Boolean);
-                        g.lastSummary = `【待取包裹：共 ${pending} 件】`
+                        g.lastSummary = `【待取包裹：共 ${display} 件】`
                             + (codes.length ? ` 取件码 ${codes.join('、')}。` : ' 已自动聚合多源物流通知。')
                             + (station ? ` 驿站提示当前滞留 ${station} 件。` : '');
                     });
@@ -1413,7 +1472,8 @@
                     expandedBlocked, toggleBlocked, removeNotification,
                     markAllRead, toggleTxnDirection,
                     manualOpen, manualAmount, manualDirection, manualNote,
-                    openManual, submitManual, editTxnAmount
+                    openManual, submitManual, editTxnAmount,
+                    manualExpress, setExpressCount, unlockExpress, adoptSystemCount
                 };
             }
         }).mount('#app');
