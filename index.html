@@ -45,6 +45,7 @@
                         <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="cpu" class="w-5 h-5"></i>
                             <span>聚合体</span>
+                            <span v-if="pendingChanges.length" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ pendingChanges.length }}</span>
                         </div>
                         <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="sliders" class="w-5 h-5"></i>
@@ -233,19 +234,28 @@
                                     <div class="flex items-center gap-2 flex-wrap text-[11px] md:text-xs">
                                         <i data-lucide="package" class="w-3.5 h-3.5 text-indigo-600"></i>
                                         <span class="font-bold text-slate-800">待取快递 {{ group.express.count }} 件</span>
+                                        <span v-if="purchasedCount > 0" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">已购 {{ purchasedCount }} 件</span>
                                         <span v-if="group.express.mergedCount > 0" class="text-[10px] text-slate-400">去重 {{ group.express.mergedCount }} 条</span>
-                                        <button @click.stop="setExpressCount()" class="ml-auto text-[10px] text-slate-400 hover:text-indigo-600">修正件数</button>
+                                        <button @click.stop="setPurchasedCount()" class="ml-auto text-[10px] text-slate-400 hover:text-indigo-600">设置已购件数</button>
                                     </div>
-                                    <div class="flex items-center gap-2 flex-wrap text-[10px]">
-                                        <template v-if="group.express.locked">
-                                            <span class="text-amber-600">已锁定为 {{ group.express.manualCount }} 件</span>
-                                            <button @click.stop="unlockExpress()" class="text-slate-400 hover:text-rose-600">解除锁定</button>
-                                        </template>
-                                        <template v-if="group.express.mismatch">
-                                            <span class="text-amber-700">系统统计 {{ group.express.systemCount }} 件</span>
-                                            <button @click.stop="adoptSystemCount(group.express)" class="px-2 py-0.5 bg-amber-600 text-white rounded">采用系统值</button>
-                                        </template>
+
+                                    <!-- 无取件码的签收通知：让用户选是哪一件 -->
+                                    <div v-for="pk in group.express.pendingPickups" :key="'pk-' + pk.id"
+                                         class="rounded-lg bg-amber-50 border border-amber-300 p-2 space-y-1.5">
+                                        <div class="text-[11px] font-bold text-amber-900">检测到一条签收通知，请选择已签收的包裹</div>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <button v-for="p in group.express.parcels" :key="p.code || p.time"
+                                                    @click.stop="confirmPickup(pk.id, p.code)"
+                                                    class="px-2 py-1 bg-white border border-amber-400 text-amber-800 text-[10px] rounded hover:bg-amber-100">
+                                                {{ p.code || '无码包裹' }}
+                                            </button>
+                                            <button @click.stop="ignorePickup(pk.id)"
+                                                    class="px-2 py-1 bg-white border border-slate-300 text-slate-600 text-[10px] rounded hover:bg-slate-100">
+                                                不是我的
+                                            </button>
+                                        </div>
                                     </div>
+
                                     <div v-for="(p, i) in group.express.parcels.slice(0, 3)" :key="i" class="flex items-center gap-2 text-[10px] text-slate-500">
                                         <span class="w-20 shrink-0 font-medium tabular-nums">{{ p.code || '待出码' }}</span>
                                         <span class="flex-1 min-w-0 truncate">已到驿站，请及时取件</span>
@@ -486,6 +496,7 @@
                 <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="cpu" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">聚合</span>
+                    <span v-if="pendingChanges.length" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-white text-[9px] leading-[15px] text-center">{{ pendingChanges.length }}</span>
                 </div>
                 <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="sliders" class="w-5 h-5"></i>
@@ -576,6 +587,34 @@
                 const ruleList = ref([]);
                 const newRule = ref({ app: '', keyword: '', targetCat: '重要/紧急待办' });
 
+                const confirmPickup = async (notifId, code) => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/history/${notifId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pickup_code: code || '', pickup_confirmed: true }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchHistory();
+                    } catch (e) {
+                        alert('确认失败：' + e.message);
+                    }
+                };
+
+                const ignorePickup = async (notifId) => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/history/${notifId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pickup_ignored: true }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchHistory();
+                    } catch (e) {
+                        alert('操作失败：' + e.message);
+                    }
+                };
+
                 // 重要任务时间变更：待用户确认
                 const reviewOpen = ref(false);
                 const reviewSource = ref(null);
@@ -600,36 +639,30 @@
                     else s.add(key);
                 };
 
-                // 快递手动件数：锁定后用 localStorage 记，系统件数变化时提示用户确认
-                const MANUAL_EXPRESS_KEY = 'quipus_manual_express';
-                const manualExpress = ref((() => {
+                // 快递：已购件数（只做展示，方便和系统统计对比）
+                const PURCHASED_KEY = 'quipus_purchased_count';
+                const purchasedCount = ref((() => {
                     try {
-                        const v = JSON.parse(localStorage.getItem(MANUAL_EXPRESS_KEY) || 'null');
-                        return v && v.count > 0 ? v : null;
+                        const v = parseInt(localStorage.getItem(PURCHASED_KEY) || '0', 10);
+                        return Number.isFinite(v) && v > 0 ? v : 0;
                     } catch (e) {
-                        return null;
+                        return 0;
                     }
                 })());
-                const saveManualExpress = (v) => {
-                    manualExpress.value = v;
-                    try {
-                        if (v) localStorage.setItem(MANUAL_EXPRESS_KEY, JSON.stringify(v));
-                        else localStorage.removeItem(MANUAL_EXPRESS_KEY);
-                    } catch (e) { /* 隐私模式写入失败时忽略 */ }
-                };
-                const setExpressCount = () => {
-                    const cur = manualExpress.value ? manualExpress.value.count : '';
-                    const raw = prompt('当前待取件数（输入 0 = 清零并解除锁定）', String(cur));
+                const setPurchasedCount = () => {
+                    const raw = prompt('已购买 / 在途的包裹数（输入 0 清除）', String(purchasedCount.value || ''));
                     if (raw === null) return;
                     const n = parseInt(raw, 10);
                     if (Number.isNaN(n) || n < 0) {
                         alert('请输入 0 或正整数');
                         return;
                     }
-                    saveManualExpress(n > 0 ? { count: n, ts: Date.now() } : null);
+                    purchasedCount.value = n;
+                    try {
+                        if (n > 0) localStorage.setItem(PURCHASED_KEY, String(n));
+                        else localStorage.removeItem(PURCHASED_KEY);
+                    } catch (e) { /* 隐私模式忽略 */ }
                 };
-                const unlockExpress = () => saveManualExpress(null);
-                const adoptSystemCount = () => saveManualExpress(null);
 
                 // 聚合体看板里"标记已读"（= 删除这条通知）
                 const removeNotification = async (id) => {
@@ -890,13 +923,18 @@
                     if (!EXPRESS_ANY.test(body)) return null;
 
                     if (EXPRESS_CLEAR.test(body)) return { type: 'clear' };
+
+                    // 签收优先于「剩余 n」：只有用户明确知道签的是哪一件，才能正确减掉
+                    if (EXPRESS_PICKUP.test(body)) {
+                        const code = pickPickupCode(body) || (body.match(/(\d{1,3}(?:[-–—]\d{1,5}){1,2})/) || [])[1] || '';
+                        return { type: 'pickup', code: code.replace(/[–—]/g, '-') };
+                    }
                     const rm = body.match(EXPRESS_REMAIN);
                     if (rm) return { type: 'remain', count: parseInt(rm[1], 10) };
                     if (EXPRESS_STALE.test(body)) {
                         const m = body.match(/有\s*(\d+)\s*个/) || body.match(/(\d+)\s*个[^，。]{0,12}(滞留|超时)/);
                         return { type: 'stale', count: m ? parseInt(m[1], 10) : 0 };
                     }
-                    if (EXPRESS_PICKUP.test(body)) return { type: 'pickup' };
                     if (!EXPRESS_ARRIVE.test(body)) return null;
                     if (EXPRESS_NOT_ARRIVE.test(body)) return null;
                     return { type: 'arrive', code: pickPickupCode(body) };
@@ -1080,6 +1118,9 @@
                                 ts,
                                 time: toHHMM(item.created_at),
                                 app: item.data.app_name || '未知来源',
+                                pickupCode: item.data.pickup_code || '',
+                                confirmed: !!item.data.pickup_confirmed,
+                                ignored: !!item.data.pickup_ignored,
                             });
                             if (!groups[key].lastTs || ts >= groups[key].lastTs) {
                                 groups[key].lastTs = ts;
@@ -1168,6 +1209,7 @@
                         let merged = 0;
                         let pending = 0;
                         let station = 0;
+                        const pendingPickups = [];
                         for (const e of evts) {
                             if (e.type === 'arrive') {
                                 const dup = parcels.find(
@@ -1185,8 +1227,23 @@
                                 }
                                 pending = parcels.length;
                             } else if (e.type === 'pickup') {
-                                pending = Math.max(0, pending - 1);
-                                parcels = parcels.slice(0, pending);
+                                if (e.ignored) continue;
+                                const code = e.code || e.pickupCode || '';
+                                if (e.confirmed) {
+                                    // 用户已指定是哪一件
+                                    const idx = code ? parcels.findIndex((p) => p.code === code) : -1;
+                                    if (idx >= 0) parcels.splice(idx, 1);
+                                    else if (parcels.length) parcels.shift();
+                                } else if (code) {
+                                    const idx = parcels.findIndex((p) => p.code === code);
+                                    if (idx >= 0) parcels.splice(idx, 1);
+                                    // 码没对上（可能是文本里混了别的数字）：也交给用户确认
+                                    else pendingPickups.push({ id: e.id, time: e.time });
+                                } else {
+                                    // 没有取件码的签收通知：交给用户选是哪一件
+                                    pendingPickups.push({ id: e.id, time: e.time });
+                                }
+                                pending = parcels.length;
                             } else if (e.type === 'remain') {
                                 pending = Math.max(0, e.count);
                                 if (parcels.length > pending) parcels = parcels.slice(0, pending);
@@ -1199,21 +1256,12 @@
                             }
                         }
                         g.parcels = parcels;
-                        g.systemCount = pending;
-                        // 手动锁定的件数优先显示；系统件数变化时由用户决定是否采用
-                        let display = pending;
-                        const manual = manualExpress.value;
-                        if (manual && manual.count > 0) {
-                            display = manual.count;
-                            g.manualCount = manual.count;
-                            g.locked = true;
-                            g.mismatch = pending !== manual.count;
-                        }
-                        g.businessCount = display;
+                        g.pendingPickups = pendingPickups;
+                        g.businessCount = pending;
                         g.mergedCount = merged;
                         g.stationCount = station;
                         const codes = parcels.map((p) => p.code).filter(Boolean);
-                        g.lastSummary = `【待取包裹：共 ${display} 件】`
+                        g.lastSummary = `【待取包裹：共 ${pending} 件】`
                             + (codes.length ? ` 取件码 ${codes.join('、')}。` : ' 已自动聚合多源物流通知。')
                             + (station ? ` 驿站提示当前滞留 ${station} 件。` : '');
                     });
@@ -1232,12 +1280,9 @@
                                 count: g.businessCount,
                                 codes: (g.parcels || []).map((p) => p.code).filter(Boolean),
                                 parcels: g.parcels || [],
+                                pendingPickups: g.pendingPickups || [],
                                 mergedCount: g.mergedCount || 0,
                                 stationCount: g.stationCount || 0,
-                                locked: !!g.locked,
-                                manualCount: g.manualCount,
-                                systemCount: g.systemCount,
-                                mismatch: !!g.mismatch,
                                 lastTime: g.lastTime,
                             };
                             const t = g.lastTs || toTs(g.lastTime) || 0;
@@ -1639,7 +1684,7 @@
                     manualOpen, manualAmount, manualDirection, manualNote,
                     openManual, submitManual, editTxnAmount,
                     txnEditOpen, txnEditAmount, txnEditDirection, openTxnEdit, submitTxnEdit,
-                    manualExpress, setExpressCount, unlockExpress, adoptSystemCount
+                    purchasedCount, setPurchasedCount, confirmPickup, ignorePickup
                 };
             }
         }).mount('#app');

@@ -80,6 +80,9 @@ class UpdateRequest(BaseModel):
     change_note: str | None = None
     direction: str | None = None           # expense / income，手动改向
     amount: float | None = None
+    pickup_code: str | None = None         # 用户为签收通知指定的取件码
+    pickup_confirmed: bool | None = None   # 用户已确认这条签收对应哪一件
+    pickup_ignored: bool | None = None     # 用户判定"不是我的快递"
 
 @app.get("/")
 def read_root():
