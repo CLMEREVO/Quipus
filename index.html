@@ -256,15 +256,16 @@
                                 <!-- 其余消息（保留应用名） -->
                                 <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
                                     <div v-for="r in group.rows.slice(0, 6)" :key="(r.ids && r.ids[0]) || r.title"
-                                         class="flex items-start gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
-                                        <span class="flex-1 min-w-0">
-                                            <span class="text-[10px] text-slate-400 mr-1">{{ r.app }}</span>
-                                            <span class="font-medium text-slate-800">{{ r.title }}</span>
-                                            <span v-if="r.count > 1" class="ml-1 text-[10px] text-slate-400">×{{ r.count }}</span>
-                                        </span>
-                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ r.time }}</span>
-                                        <button @click.stop="removeNotification(r.id)" title="标记已读（删除）"
-                                                class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+                                         class="px-2.5 py-2 text-[11px] md:text-xs space-y-0.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] text-slate-400 shrink-0">{{ r.app }}</span>
+                                            <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ r.title }}</span>
+                                            <span v-if="r.count > 1" class="shrink-0 text-[10px] text-slate-400">×{{ r.count }}</span>
+                                            <span class="shrink-0 text-slate-400 tabular-nums">{{ r.time }}</span>
+                                            <button @click.stop="removeNotification(r.id)" title="标记已读（删除）"
+                                                    class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+                                        </div>
+                                        <div v-if="r.summary" class="text-[10px] text-slate-500 truncate">{{ r.summary }}</div>
                                     </div>
                                     <div v-if="group.rows.length > 6" class="px-2.5 py-1.5 text-[10px] text-slate-400">
                                         还有 {{ group.rows.length - 6 }} 条未展开…
@@ -273,7 +274,7 @@
                                 <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
                             </template>
 
-                            <!-- 重要待办：一卡分条，最新的在上面 -->
+                            <!-- 重要待办：一卡分条，待确认变更置顶 -->
                             <template v-else-if="group.kind === 'urgent'">
                                 <div class="flex items-center justify-between gap-2 flex-wrap">
                                     <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
@@ -282,20 +283,53 @@
                                     <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
                                         共 {{ group.businessCount }} 条
                                     </span>
+                                    <span v-if="pendingChanges.length"
+                                          class="text-[10px] md:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
+                                        待确认 {{ pendingChanges.length }}
+                                    </span>
                                     <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
                                 </div>
-                                <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
-                                    <div v-for="(t, i) in group.items.slice(0, 4)" :key="t.id" class="flex items-start gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
-                                        <span class="flex-1 min-w-0">
-                                            <span class="font-medium text-slate-800">{{ t.title }}</span>
-                                            <span v-if="t.changed" class="ml-1 text-[10px] text-rose-600 font-bold">变更</span>
-                                        </span>
-                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
-                                        <button @click.stop="removeNotification(t.id)" title="标记已读（删除）"
-                                                class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+
+                                <!-- 待用户确认的时间变更 -->
+                                <div v-for="c in pendingChanges" :key="'chg-' + c.id"
+                                     class="rounded-lg bg-amber-50 border border-amber-300 p-2.5 space-y-2">
+                                    <div class="text-[11px] md:text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 检测到可能的任务时间变更
                                     </div>
-                                    <div v-if="group.items.length > 4" class="px-2.5 py-1.5 text-[10px] text-slate-400">
-                                        还有 {{ group.items.length - 4 }} 条未展开…
+                                    <p class="text-[11px] text-amber-800 leading-relaxed">
+                                        「{{ c.data.title }}」<template v-if="c.data.related_task">，可能是「{{ c.data.related_task }}」</template><template v-else>，但没能识别出是哪条任务</template>
+                                        <span class="block text-[10px] text-amber-700/80 mt-0.5">原文：{{ c.original }}</span>
+                                    </p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button @click="openChangeReview(c, true)"
+                                                class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] rounded-lg transition">
+                                            是，修改这条任务
+                                        </button>
+                                        <button @click="openChangeReview(c, false)"
+                                                class="px-3 py-1.5 bg-white border border-amber-400 text-amber-800 text-[11px] rounded-lg hover:bg-amber-100 transition">
+                                            有变更，但不是这条
+                                        </button>
+                                        <button @click="ignoreChange(c)"
+                                                class="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-[11px] rounded-lg hover:bg-slate-100 transition">
+                                            不是变更
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="rounded-lg bg-white/60 divide-y divide-rose-100">
+                                    <div v-for="t in group.items.slice(0, 6)" :key="t.id" class="px-2.5 py-2 text-[11px] md:text-xs space-y-0.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] text-slate-400 shrink-0">{{ t.app }}</span>
+                                            <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ t.title }}</span>
+                                            <span v-if="t.changed" class="shrink-0 text-[10px] text-rose-600 font-bold">变更</span>
+                                            <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
+                                            <button @click.stop="removeNotification(t.id)" title="标记已读（删除）"
+                                                    class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+                                        </div>
+                                        <div v-if="t.summary" class="text-[10px] text-slate-500 truncate">{{ t.summary }}</div>
+                                    </div>
+                                    <div v-if="group.items.length > 6" class="px-2.5 py-1.5 text-[10px] text-slate-400">
+                                        还有 {{ group.items.length - 6 }} 条未展开…
                                     </div>
                                 </div>
                                 <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
@@ -382,30 +416,7 @@
                         <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
 
-                    <!-- 待确认的重要任务时间变更 -->
-                    <div v-for="c in pendingChanges" :key="'chg-' + c.id"
-                         class="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-2">
-                        <div class="flex items-center gap-2 text-sm font-bold text-amber-900">
-                            <i data-lucide="alert-triangle" class="w-4 h-4"></i> 检测到可能的任务时间变更
-                        </div>
-                        <p class="text-xs text-amber-800">
-                            「{{ c.data.title }}」<template v-if="c.data.related_task">，可能是「{{ c.data.related_task }}」</template><template v-else>，但没能识别出是哪条任务</template>
-                        </p>
-                        <div class="flex flex-wrap gap-2 pt-1">
-                            <button @click="openChangeReview(c, true)"
-                                    class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg transition">
-                                是，修改这条任务
-                            </button>
-                            <button @click="openChangeReview(c, false)"
-                                    class="px-3 py-1.5 bg-white border border-amber-400 text-amber-800 text-xs rounded-lg hover:bg-amber-100 transition">
-                                有变更，但不是这条
-                            </button>
-                            <button @click="ignoreChange(c)"
-                                    class="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg hover:bg-slate-100 transition">
-                                不是变更
-                            </button>
-                        </div>
-                    </div>
+                    <!-- 待确认的重要任务时间变更（已移入聚合体的「重要待办」卡片） -->
 
                     <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">正在加载数据...</div>
                     <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">当前分类下暂无通知记录。</div>
@@ -618,10 +629,7 @@
                     saveManualExpress(n > 0 ? { count: n, ts: Date.now() } : null);
                 };
                 const unlockExpress = () => saveManualExpress(null);
-                const adoptSystemCount = (group) => {
-                    const n = group.systemCount || 0;
-                    saveManualExpress(n > 0 ? { count: n, ts: Date.now() } : null);
-                };
+                const adoptSystemCount = () => saveManualExpress(null);
 
                 // 聚合体看板里"标记已读"（= 删除这条通知）
                 const removeNotification = async (id) => {
@@ -1063,11 +1071,12 @@
                                 groups[key].lastTime = item.created_at;
                             }
                         }
-                        // 2. 快递：先收集事件，循环结束后按时间推演待取件数
+                        // 2. 快递：先收集事件，循环结束后按接收顺序推演待取件数
                         else if (isExpressDelivery) {
                             const ts = toTs(item.created_at);
                             groups[key].events.push({
                                 ...express,
+                                id: item.id,
                                 ts,
                                 time: toHHMM(item.created_at),
                                 app: item.data.app_name || '未知来源',
@@ -1152,7 +1161,9 @@
                     // 到达 +1；签收 −1；「剩余 n 个」直接覆盖；「全部签收」清零；滞留做校正
                     list.forEach(g => {
                         if (g.kind !== 'express') return;
-                        const evts = [...g.events].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+                        // 按「接收顺序」推演（id 递增），而不是按 created_at：
+                        // 种子数据的时间戳可能晚于用户新录入的消息，按时间排会把旧事件重放到最后
+                        const evts = [...g.events].sort((a, b) => (a.id || 0) - (b.id || 0));
                         let parcels = [];
                         let merged = 0;
                         let pending = 0;
@@ -1183,11 +1194,8 @@
                                 pending = 0;
                                 parcels = [];
                             } else if (e.type === 'stale') {
+                                // 滞留只是"告知"，不是总数：只记录提示，不覆盖件数
                                 station = e.count;
-                                if (e.count > 0) {
-                                    pending = e.count;
-                                    if (parcels.length > pending) parcels = parcels.slice(0, pending);
-                                }
                             }
                         }
                         g.parcels = parcels;
@@ -1615,7 +1623,6 @@
 
                 onMounted(() => {
                     lucide.createIcons();
-                    loadSample(1);
                     fetchHistory();
                     fetchStats();
                     fetchRules();
