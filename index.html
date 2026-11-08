@@ -199,6 +199,7 @@
                                 <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
                                     <div v-for="(tx, i) in group.txns.slice(0, 5)" :key="i" class="flex items-center gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
                                         <span class="flex-1 min-w-0 truncate text-slate-700 font-medium">{{ tx.apps.join(' + ') }}</span>
+                                        <span v-if="tx.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                         <span class="shrink-0 text-slate-400 tabular-nums">{{ tx.time }}</span>
                                         <span class="shrink-0 font-bold tabular-nums"
                                               :class="tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-800'">
@@ -226,6 +227,10 @@
                                             class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold hover:bg-indigo-300 transition">
                                         <template v-if="group.express">{{ group.express.count }} 件快递 · </template>{{ group.totalOtherMessages }} 条消息
                                     </button>
+                                    <span v-if="expressPendingCount > 0"
+                                          class="text-[10px] md:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
+                                        待确认 {{ expressPendingCount }}
+                                    </span>
                                     <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
                                 </div>
 
@@ -234,6 +239,7 @@
                                     <div class="flex items-center gap-2 flex-wrap text-[11px] md:text-xs">
                                         <i data-lucide="package" class="w-3.5 h-3.5 text-indigo-600"></i>
                                         <span class="font-bold text-slate-800">待取快递 {{ group.express.count }} 件</span>
+                                        <span v-if="group.express.seed" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                         <span v-if="purchasedCount > 0" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">已购 {{ purchasedCount }} 件</span>
                                         <span v-if="group.express.mergedCount > 0" class="text-[10px] text-slate-400">去重 {{ group.express.mergedCount }} 条</span>
                                         <button @click.stop="setPurchasedCount()" class="ml-auto text-[10px] text-slate-400 hover:text-indigo-600">设置已购件数</button>
@@ -288,6 +294,7 @@
                                         <div class="flex items-center gap-2">
                                             <span class="text-[10px] text-slate-400 shrink-0">{{ r.app }}</span>
                                             <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ r.title }}</span>
+                                            <span v-if="r.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                             <span v-if="r.count > 1" class="shrink-0 text-[10px] text-slate-400">×{{ r.count }}</span>
                                             <span class="shrink-0 text-slate-400 tabular-nums">{{ r.time }}</span>
                                             <button @click.stop="removeNotification(r.id)" title="标记已读（删除）"
@@ -311,9 +318,9 @@
                                     <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
                                         共 {{ group.businessCount }} 条
                                     </span>
-                                    <span v-if="totalPending > 0"
+                                    <span v-if="pendingChanges.length > 0"
                                           class="text-[10px] md:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
-                                        待确认 {{ totalPending }}
+                                        待确认 {{ pendingChanges.length }}
                                     </span>
                                     <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
                                 </div>
@@ -349,6 +356,7 @@
                                         <div class="flex items-center gap-2">
                                             <span class="text-[10px] text-slate-400 shrink-0">{{ t.app }}</span>
                                             <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ t.title }}</span>
+                                            <span v-if="t.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                             <span v-if="t.changed" class="shrink-0 text-[10px] text-rose-600 font-bold">变更</span>
                                             <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
                                             <button @click.stop="removeNotification(t.id)" title="标记已读（删除）"
@@ -472,6 +480,7 @@
                                     </span>
                                     <span v-if="item.data.is_urgent" class="bg-rose-600 text-white text-[11px] md:text-xs px-2 py-0.5 rounded-full font-bold animate-pulse whitespace-nowrap">🔥 紧急置顶</span>
                                     <span v-if="item.data.reclassified" class="bg-amber-100 text-amber-700 text-[10px] md:text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">分类已变更</span>
+                                    <span v-if="item.data.seed" class="bg-slate-200 text-slate-600 text-[10px] md:text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">测试用</span>
                                 </div>
                                 <div class="flex items-center gap-1.5 md:gap-3 ml-auto">
                                     <span class="text-[10px] md:text-xs text-slate-400 whitespace-nowrap">{{ item.created_at }}</span>
@@ -1122,6 +1131,7 @@
                                 time: toHHMM(item.created_at),
                                 ids: [item.id],
                                 manual: !!item.data.manual,
+                                seed: !!item.data.seed,
                                 apps: [item.data.app_name || '未知来源'],
                             };
                             // 同一笔的唯一判据：同向 + 同额 + 5 秒内 + 来源不同。
@@ -1136,6 +1146,7 @@
                             if (dup) {
                                 if (!dup.apps.includes(txn.apps[0])) dup.apps.push(txn.apps[0]);
                                 dup.ids.push(item.id);
+                                if (txn.seed) dup.seed = true;
                                 groups[key].mergedCount += 1;
                             } else {
                                 groups[key].txns.push(txn);
@@ -1164,6 +1175,7 @@
                                 ts,
                                 time: toHHMM(item.created_at),
                                 app: item.data.app_name || '未知来源',
+                                seed: !!item.data.seed,
                                 pickupCode: item.data.pickup_code || '',
                                 confirmed: !!item.data.pickup_confirmed,
                                 ignored: !!item.data.pickup_ignored,
@@ -1186,6 +1198,7 @@
                                     ts,
                                     time: toHHMM(item.created_at),
                                     changed: !!item.data.is_time_change,
+                                    seed: !!item.data.seed,
                                 });
                             }
                             groups[key].businessCount = groups[key].items.length;
@@ -1206,6 +1219,7 @@
                                     summary: item.data.summary || '',
                                     ts,
                                     time: toHHMM(item.created_at),
+                                    seed: !!item.data.seed,
                                 });
                             }
                             groups[key].businessCount = groups[key].items.length;
@@ -1229,6 +1243,7 @@
                                     summary: item.data.summary || '',
                                     ts,
                                     time: toHHMM(item.created_at),
+                                    seed: !!item.data.seed,
                                 });
                             }
                             groups[key].businessCount = groups[key].items.length;
@@ -1340,6 +1355,7 @@
                             otherCard.msgCount += g.count || 0;
                             otherCard.express = {
                                 count: g.businessCount,
+                                seed: (g.events || []).some((e) => e.seed),
                                 codes: (g.parcels || []).map((p) => p.code).filter(Boolean),
                                 parcels: g.parcels || [],
                                 pendingPickups: g.pendingPickups || [],
@@ -1364,6 +1380,7 @@
                                 count: g.count,
                                 summary: g.lastSummary,
                                 app: g.items && g.items[0] ? g.items[0].app : '',
+                                seed: (g.items || []).some((x) => x.seed),
                                 time: toHHMM(g.lastTime),
                                 ts: t,
                             });
