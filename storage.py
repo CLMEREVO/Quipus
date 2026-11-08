@@ -67,6 +67,9 @@ def apply_custom_rules(app_name: str, raw_text: str, result: dict[str, Any]) -> 
                 result["category"] = r["target_cat"]
                 result["is_urgent"] = bool(r["is_urgent"])
                 result["custom_rule"] = True
+                # 自定义规则要求"直接已读"的，前端不再展示
+                if r["target_cat"] == "无效广告/促销":
+                    result["auto_read"] = True
                 result["summary"] = f"[自定义] {result.get('summary', '')}"
                 break
     return result
@@ -232,6 +235,23 @@ def update_notification(item_id: int, patch: dict[str, Any]) -> dict[str, Any] |
                 ),
             )
     return {"id": item_id, "created_at": row["created_at"], "original": row["raw_text"], "data": data}
+
+
+def save_manual_entry(amount: float, direction: str, note: str = "") -> dict[str, Any]:
+    """手动记账：用户在聚合卡里补一笔手机账单里没有的收支。"""
+    kind = "支出" if direction == "expense" else "收入"
+    result: dict[str, Any] = {
+        "app_name": "手动记账",
+        "category": "其他类",
+        "title": (note or "").strip() or f"手动{kind}",
+        "summary": f"手动记录{kind} ¥{amount:.2f}" + (f"（{note.strip()}）" if note and note.strip() else ""),
+        "is_urgent": False,
+        "event_key": "手动记账",
+        "amount": float(amount),
+        "direction": direction,
+        "manual": True,
+    }
+    return save_notification(f"[手动记账] {kind} {amount:.2f} 元 {note or ''}".strip(), result)
 
 
 def get_custom_rules() -> list[dict[str, Any]]:

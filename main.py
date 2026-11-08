@@ -14,6 +14,7 @@ from storage import (
     clear,
     delete_notification,
     update_notification,
+    save_manual_entry,
     list_notifications,
     save_notification,
     stats,
@@ -149,6 +150,18 @@ def patch_notification(item_id: int, data: UpdateRequest):
     if updated is None:
         raise HTTPException(status_code=404, detail="通知不存在")
     return {"status": "success", **updated}
+
+class ManualEntryRequest(BaseModel):
+    amount: float = Field(..., gt=0, lt=100000)
+    direction: str = Field(..., pattern="^(expense|income)$")
+    note: str = ""
+
+
+@app.post("/api/manual")
+def add_manual_entry(data: ManualEntryRequest):
+    record = save_manual_entry(data.amount, data.direction, data.note)
+    return {"status": "success", "id": record["id"], "data": record["data"]}
+
 
 @app.post("/api/seed/refresh")
 def refresh_seed():

@@ -176,6 +176,7 @@
                                     <span class="text-[10px] md:text-xs bg-white/70 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
                                         共 {{ group.businessCount }} 笔<template v-if="group.mergedCount > 0"> · 去重 {{ group.mergedCount }} 条同源推送</template>
                                     </span>
+                                    <button @click.stop="openManual()" class="text-[10px] text-slate-400 hover:text-indigo-600">＋手动记账</button>
                                 </div>
 
                                 <div class="flex items-end gap-5 flex-wrap">
@@ -200,6 +201,8 @@
                                         <button @click.stop="toggleTxnDirection(tx)"
                                                 :title="tx.direction === 'income' ? '改为支出' : '改为收入'"
                                                 class="shrink-0 text-[10px] text-slate-300 hover:text-indigo-600">改</button>
+                                        <button v-if="tx.manual" @click.stop="editTxnAmount(tx)" title="修改金额"
+                                                class="shrink-0 text-[10px] text-slate-300 hover:text-indigo-600">✎</button>
                                     </div>
                                     <div v-if="group.txns.length > 5" class="px-2.5 py-1.5 text-[10px] text-slate-400">
                                         还有 {{ group.txns.length - 5 }} 笔未展开…
@@ -465,6 +468,25 @@
                 </div>
             </div>
         </div>
+        <!-- 手动记账弹窗 -->
+        <div v-if="manualOpen" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl w-full max-w-sm p-5 space-y-3 shadow-xl">
+                <h3 class="font-bold text-slate-800">手动记账</h3>
+                <p class="text-xs text-slate-500">记录手机账单里没有的收支，会单独列为一条。</p>
+                <select v-model="manualDirection" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                    <option value="expense">支出</option>
+                    <option value="income">收入</option>
+                </select>
+                <input v-model="manualAmount" type="number" step="0.01" placeholder="金额，如 68.00"
+                       class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                <input v-model="manualNote" type="text" placeholder="备注（可选）"
+                       class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                <div class="flex justify-end gap-2">
+                    <button @click="manualOpen = false" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">取消</button>
+                    <button @click="submitManual" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg transition">记一笔</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -496,7 +518,11 @@
                 const reviewTargetId = ref(null);
                 const reviewSummary = ref('');
 
-                // 拦截类卡片展开状态
+                // 支付卡里的手动记账
+                const manualOpen = ref(false);
+                const manualAmount = ref('');
+                const manualDirection = ref('expense');
+                const manualNote = ref('');
                 const expandedBlocked = ref(new Set());
                 const toggleBlocked = (key) => {
                     const s = expandedBlocked.value;
@@ -547,6 +573,62 @@
                         await fetchStats();
                     } catch (e) {
                         alert('修改收支方向失败：' + e.message);
+                    }
+                };
+
+                const openManual = () => {
+                    manualAmount.value = '';
+                    manualDirection.value = 'expense';
+                    manualNote.value = '';
+                    manualOpen.value = true;
+                };
+
+                const submitManual = async () => {
+                    const amount = parseFloat(manualAmount.value);
+                    if (!Number.isFinite(amount) || amount <= 0) {
+                        alert('请输入有效金额');
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/api/manual`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                amount,
+                                direction: manualDirection.value,
+                                note: manualNote.value.trim(),
+                            }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        manualOpen.value = false;
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('记账失败：' + e.message);
+                    }
+                };
+
+                const editTxnAmount = async (txn) => {
+                    const v = prompt('修改金额（元）', txn.amount.toFixed(2));
+                    if (v === null) return;
+                    const n = parseFloat(v);
+                    if (!Number.isFinite(n) || n <= 0) {
+                        alert('金额不合法');
+                        return;
+                    }
+                    try {
+                        for (const id of txn.ids || []) {
+                            const res = await fetch(`${API_BASE}/api/history/${id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ amount: n }),
+                            });
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        }
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('修改金额失败：' + e.message);
                     }
                 };
 
@@ -821,6 +903,7 @@
                                 ts: toTs(item.created_at),
                                 time: toHHMM(item.created_at),
                                 ids: [item.id],
+                                manual: !!item.data.manual,
                                 apps: [item.data.app_name || '未知来源'],
                             };
                             // 同一笔的唯一判据：同向 + 同额 + 5 秒内 + 来源不同。
@@ -1006,11 +1089,13 @@
                                 return item;
                             });
 
-                            // 变更类消息不进列表，只在顶部提示卡里出现
+                            // 变更类消息不进列表，只在顶部提示卡里出现；自定义"直接已读"的也不展示
                             pendingChanges.value = allItems.filter(
                                 (i) => i.data && i.data.is_time_change && !i.data.change_review
                             );
-                            const visible = allItems.filter((i) => !(i.data && i.data.is_time_change));
+                            const visible = allItems.filter(
+                                (i) => !(i.data && i.data.is_time_change) && !(i.data && i.data.auto_read)
+                            );
 
                             // 按当前 Tab 本地渲染过滤
                             const tab = currentTab.value;
@@ -1326,7 +1411,9 @@
                     pendingChanges, urgentTargets, reviewOpen, reviewSource, reviewTargetId, reviewSummary,
                     openChangeReview, applyReview, ignoreChange,
                     expandedBlocked, toggleBlocked, removeNotification,
-                    markAllRead, toggleTxnDirection
+                    markAllRead, toggleTxnDirection,
+                    manualOpen, manualAmount, manualDirection, manualNote,
+                    openManual, submitManual, editTxnAmount
                 };
             }
         }).mount('#app');
