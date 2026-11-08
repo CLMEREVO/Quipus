@@ -76,6 +76,10 @@ def apply_custom_rules(app_name: str, raw_text: str, result: dict[str, Any]) -> 
             text_matched = text_kw in raw_text
             
             if app_matched and text_matched:
+                # 记住模型原始判断，删除规则时用来还原
+                if "prev_category" not in result:
+                    result["prev_category"] = result.get("category")
+                    result["prev_is_urgent"] = bool(result.get("is_urgent"))
                 result["category"] = r["target_cat"]
                 result["is_urgent"] = bool(r["is_urgent"])
                 result["custom_rule"] = True
@@ -285,6 +289,9 @@ def reclassify_existing(app_keyword: str, text_keyword: str, target_cat: str) ->
                 data = json.loads(row["result_json"])
                 if data.get("category") == target_cat and data.get("custom_rule"):
                     continue
+                if "prev_category" not in data:
+                    data["prev_category"] = data.get("category")
+                    data["prev_is_urgent"] = bool(data.get("is_urgent"))
                 data["category"] = target_cat
                 data["is_urgent"] = bool(is_urgent)
                 data["custom_rule"] = True
@@ -314,11 +321,62 @@ def add_custom_rule(app_keyword: str, text_keyword: str, target_cat: str) -> int
             )
             return cur.lastrowid
 
-def delete_custom_rule(rule_id: int) -> int:
+def _revert_rows(conn, match) -> int:
+    """把 custom_rule 改判过的消息还原成模型原始分类。"""
+    changed = 0
+    rows = conn.execute(
+        "SELECT id, raw_text, app_name, result_json FROM notifications"
+    ).fetchall()
+    for row in rows:
+        data = json.loads(row["result_json"])
+        if not data.get("custom_rule"):
+            continue
+        if not match(row["app_name"] or "", row["raw_text"] or ""):
+            continue
+        category = data.pop("prev_category", "其他类")
+        urgent = bool(data.pop("prev_is_urgent", False))
+        data["category"] = category
+        data["is_urgent"] = urgent
+        data.pop("custom_rule", None)
+        data.pop("reclassified", None)
+        data.pop("auto_read", None)
+        conn.execute(
+            "UPDATE notifications SET result_json = ?, category = ?, is_urgent = ? WHERE id = ?",
+            (json.dumps(data, ensure_ascii=False), category, 1 if urgent else 0, row["id"]),
+        )
+        changed += 1
+    return changed
+
+
+def revert_rule(app_keyword: str, text_keyword: str) -> int:
+    """删除某条规则后，把它改判过的消息还原。"""
+    app_kw = (app_keyword or "").strip()
+    text_kw = (text_keyword or "").strip()
+
+    def match(app_name: str, raw_text: str) -> bool:
+        return (not app_kw or app_kw in app_name) and text_kw in raw_text
+
     with closing(_connect()) as conn:
         with conn:
+            return _revert_rows(conn, match)
+
+
+def revert_all_rules() -> int:
+    """清空全部规则时，把所有被规则改判的消息还原。"""
+    with closing(_connect()) as conn:
+        with conn:
+            return _revert_rows(conn, lambda app_name, raw_text: True)
+
+
+def delete_custom_rule(rule_id: int) -> dict[str, Any] | None:
+    with closing(_connect()) as conn:
+        with conn:
+            row = conn.execute("SELECT * FROM custom_rules WHERE id = ?", (rule_id,)).fetchone()
+            if row is None:
+                return None
+            info = {"app_keyword": row["app_keyword"], "text_keyword": row["text_keyword"]}
             conn.execute("DELETE FROM custom_rules WHERE id = ?", (rule_id,))
-    return rule_id
+    return info
 
 def reset_custom_rules() -> None:
     with closing(_connect()) as conn:

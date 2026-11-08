@@ -22,6 +22,8 @@ from storage import (
     get_custom_rules,
     add_custom_rule,
     delete_custom_rule,
+    revert_rule,
+    revert_all_rules,
     reset_custom_rules,
 )
 
@@ -187,10 +189,13 @@ def create_rule(data: RuleRequest):
 
 @app.delete("/api/rules/{rule_id}")
 def remove_rule(rule_id: int):
-    delete_custom_rule(rule_id)
-    return {"status": "success", "deleted_id": rule_id}
+    info = delete_custom_rule(rule_id)
+    # 删除规则后，把它改判过的消息还原成模型原始分类
+    reverted = revert_rule(info["app_keyword"], info["text_keyword"]) if info else 0
+    return {"status": "success", "deleted_id": rule_id, "reverted": reverted}
 
 @app.post("/api/rules/reset")
 def reset_rules():
+    reverted = revert_all_rules()
     reset_custom_rules()
-    return {"status": "success", "message": "已恢复默认规则"}
+    return {"status": "success", "reverted": reverted, "message": "已恢复默认规则"}

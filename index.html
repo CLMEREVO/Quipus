@@ -1509,15 +1509,35 @@
                 };
 
                 const deleteRule = async (id) => {
-                    await fetch(`${API_BASE}/api/rules/${id}`, { method: 'DELETE' });
-                    fetchRules();
+                    if (!confirm('删除这条规则后，被它改判的消息会恢复成 AI 原始分类，确定删除吗？')) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/rules/${id}`, { method: 'DELETE' });
+                        const json = await res.json().catch(() => ({}));
+                        fetchRules();
+                        if (json.reverted > 0) {
+                            await fetchHistory();
+                            await fetchStats();
+                            alert(`规则已删除，${json.reverted} 条消息已恢复为 AI 原始分类`);
+                        }
+                    } catch (e) {
+                        alert('删除失败：' + e.message);
+                    }
                 };
 
                 const resetRules = async () => {
-                    if (!confirm('确定要恢复默认设置并清空所有自定义规则吗？')) return;
-                    await fetch(`${API_BASE}/api/rules/reset`, { method: 'POST' });
-                    fetchRules();
-                    alert('已恢复默认设置！');
+                    if (!confirm('确定要恢复默认设置并清空所有自定义规则吗？被改判的消息会恢复成 AI 原始分类。')) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/rules/reset`, { method: 'POST' });
+                        const json = await res.json().catch(() => ({}));
+                        fetchRules();
+                        await fetchHistory();
+                        await fetchStats();
+                        alert(json.reverted > 0
+                            ? `已恢复默认设置，${json.reverted} 条消息已还原`
+                            : '已恢复默认设置！');
+                    } catch (e) {
+                        alert('操作失败：' + e.message);
+                    }
                 };
 
                 watch(currentTab, (newTab) => {
