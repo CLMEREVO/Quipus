@@ -67,11 +67,11 @@ SEED_ITEMS: list[tuple[str, dict[str, Any]]] = [
     ),
 ]
 
-_SEED_TIMES = ["7:20", "7:20", "12:15", "12:15", "12:15"]
+_SEED_TIMES = ["07:20", "07:20", "12:15", "12:15", "12:15"]
 
 def _created_ats(n: int) -> list[str]:
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
+    
+    today = storage.today_cn()
     return [f"{today} {_SEED_TIMES[i % len(_SEED_TIMES)]}:00" for i in range(n)]
 
 def seed_if_empty() -> int:
@@ -84,8 +84,8 @@ def force_seed_samples() -> int:
     existing_texts = {item["original"] for item in existing_items}
     
     new_items_to_add = []
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
+    
+    today = storage.today_cn()
     
     for idx, (raw_text, result) in enumerate(SEED_ITEMS):
         if raw_text not in existing_texts:

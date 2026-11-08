@@ -3,11 +3,23 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 DB_PATH = Path(__file__).with_name("quipus.db")
+
+# 统一按北京时间落库：容器默认 UTC，直接用 now() 会差 8 小时。
+# 用固定 +8 偏移而不是 ZoneInfo，避免部分环境缺 tzdata（中国不使用夏令时）。
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def now_cn() -> str:
+    return datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def today_cn() -> str:
+    return datetime.now(CN_TZ).strftime("%Y-%m-%d")
 
 TAB_TO_CATEGORY: dict[str, str | list[str] | None] = {
     "overview": None,
@@ -97,7 +109,7 @@ def save_notification(raw_text: str, result: dict[str, Any]) -> dict[str, Any]:
     app_name = str(result.get("app_name") or "")
     result = apply_custom_rules(app_name, raw_text, result)
     
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_cn()
     with closing(_connect()) as conn:
         with conn:
             cur = conn.execute(_INSERT_SQL, _to_row(now, raw_text, result))
@@ -118,7 +130,7 @@ def save_many_if_empty(
         if existing:
             conn.execute("ROLLBACK")
             return 0
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = now_cn()
         rows = [
             _to_row(created_ats[i] if created_ats else now, raw, result)
             for i, (raw, result) in enumerate(items)
