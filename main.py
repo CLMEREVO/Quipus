@@ -15,6 +15,7 @@ from storage import (
     delete_notification,
     update_notification,
     save_manual_entry,
+    reclassify_existing,
     list_notifications,
     save_notification,
     stats,
@@ -174,7 +175,10 @@ def list_rules():
 
 @app.post("/api/rules")
 def create_rule(data: RuleRequest):
-    return {"status": "success", "id": add_custom_rule(data.app_keyword, data.text_keyword, data.target_cat)}
+    rule_id = add_custom_rule(data.app_keyword, data.text_keyword, data.target_cat)
+    # 立刻回扫历史，把已经收到的匹配消息一并归类，并标记「分类已变更」
+    changed = reclassify_existing(data.app_keyword, data.text_keyword, data.target_cat)
+    return {"status": "success", "id": rule_id, "reclassified": changed}
 
 @app.delete("/api/rules/{rule_id}")
 def remove_rule(rule_id: int):

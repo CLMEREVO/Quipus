@@ -254,6 +254,39 @@ def save_manual_entry(amount: float, direction: str, note: str = "") -> dict[str
     return save_notification(f"[手动记账] {kind} {amount:.2f} 元 {note or ''}".strip(), result)
 
 
+def reclassify_existing(app_keyword: str, text_keyword: str, target_cat: str) -> int:
+    """新建规则后，把历史里已经存在的匹配消息重新归类，并打上「分类已变更」标记。"""
+    is_urgent = 1 if target_cat == "重要/紧急待办" else 0
+    changed = 0
+    with closing(_connect()) as conn:
+        with conn:
+            rows = conn.execute(
+                "SELECT id, raw_text, app_name, result_json FROM notifications"
+            ).fetchall()
+            for row in rows:
+                app_name = row["app_name"] or ""
+                raw_text = row["raw_text"] or ""
+                if app_keyword and app_keyword not in app_name:
+                    continue
+                if text_keyword not in raw_text:
+                    continue
+                data = json.loads(row["result_json"])
+                if data.get("category") == target_cat and data.get("custom_rule"):
+                    continue
+                data["category"] = target_cat
+                data["is_urgent"] = bool(is_urgent)
+                data["custom_rule"] = True
+                data["reclassified"] = True
+                if target_cat == "无效广告/促销":
+                    data["auto_read"] = True
+                conn.execute(
+                    "UPDATE notifications SET result_json = ?, category = ?, is_urgent = ? WHERE id = ?",
+                    (json.dumps(data, ensure_ascii=False), target_cat, is_urgent, row["id"]),
+                )
+                changed += 1
+    return changed
+
+
 def get_custom_rules() -> list[dict[str, Any]]:
     with closing(_connect()) as conn:
         rows = conn.execute("SELECT * FROM custom_rules ORDER BY id DESC").fetchall()

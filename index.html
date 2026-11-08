@@ -432,6 +432,7 @@
                                         {{ item.data.category }}
                                     </span>
                                     <span v-if="item.data.is_urgent" class="bg-rose-600 text-white text-[11px] md:text-xs px-2 py-0.5 rounded-full font-bold animate-pulse whitespace-nowrap">🔥 紧急置顶</span>
+                                    <span v-if="item.data.reclassified" class="bg-amber-100 text-amber-700 text-[10px] md:text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">分类已变更</span>
                                 </div>
                                 <div class="flex items-center gap-1.5 md:gap-3 ml-auto">
                                     <span class="text-[10px] md:text-xs text-slate-400 whitespace-nowrap">{{ item.created_at }}</span>
@@ -1300,13 +1301,11 @@
                                 return item;
                             });
 
-                            // 变更类消息不进列表，只在顶部提示卡里出现；自定义"直接已读"的也不展示
+                            // 变更类消息不进列表，只在顶部提示卡里出现
                             pendingChanges.value = allItems.filter(
                                 (i) => i.data && i.data.is_time_change && !i.data.change_review
                             );
-                            const visible = allItems.filter(
-                                (i) => !(i.data && i.data.is_time_change) && !(i.data && i.data.auto_read)
-                            );
+                            const visible = allItems.filter((i) => !(i.data && i.data.is_time_change));
 
                             // 按当前 Tab 本地渲染过滤
                             const tab = currentTab.value;
@@ -1341,7 +1340,7 @@
                 const addRule = async () => {
                     if (!newRule.value.keyword.trim()) { alert('关键词不能为空！'); return; }
                     try {
-                        await fetch(`${API_BASE}/api/rules`, {
+                        const res = await fetch(`${API_BASE}/api/rules`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -1350,9 +1349,16 @@
                                 target_cat: newRule.value.targetCat
                             })
                         });
+                        const json = await res.json().catch(() => ({}));
                         newRule.value = { app: '', keyword: '', targetCat: '重要/紧急待办' };
                         fetchRules();
-                        alert('自定义规则添加成功！');
+                        if (json.reclassified > 0) {
+                            await fetchHistory();
+                            await fetchStats();
+                            alert(`自定义规则已添加，并重新归类了 ${json.reclassified} 条历史消息（标记为「分类已变更」）`);
+                        } else {
+                            alert('自定义规则添加成功！');
+                        }
                     } catch (e) { alert('添加失败'); }
                 };
 
