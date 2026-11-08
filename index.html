@@ -168,7 +168,7 @@
                              :class="{
                                 'from-rose-100/90 to-pink-50/80 border-rose-200': group.kind === 'urgent',
                                 'from-amber-50/90 to-indigo-50/80 border-amber-200': group.kind === 'payment',
-                                'from-indigo-50/90 to-[#EDF4FF]/80 border-indigo-200': group.kind === 'other',
+                                'from-indigo-50/85 to-amber-50/75 border-indigo-200': group.kind === 'other',
                                 'from-slate-300/95 to-slate-200/85 border-slate-400/60': group.kind === 'blocked'
                              }"
                              class="p-4 md:p-5 rounded-xl border shadow-sm space-y-2.5 md:space-y-3 bg-gradient-to-br">
@@ -374,10 +374,10 @@
                             <!-- 拦截类：小卡，只显示数量，点开看消息 -->
                             <template v-else-if="group.kind === 'blocked'">
                                 <div class="flex items-center justify-between gap-2 cursor-pointer select-none" @click="toggleBlocked(group.key)">
-                                    <span class="font-bold text-sm text-rose-700 flex items-center gap-2">
+                                    <span class="font-bold text-sm text-rose-500 flex items-center gap-2">
                                         <i data-lucide="shield-alert" class="w-4 h-4"></i> {{ group.key }}
                                     </span>
-                                    <span class="text-[10px] md:text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">
+                                    <span class="text-[10px] md:text-xs bg-rose-50 text-rose-500 px-2 py-0.5 rounded-full font-bold">
                                         {{ group.businessCount }} 条
                                     </span>
                                     <button @click.stop="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-rose-600">全部已读</button>
