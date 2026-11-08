@@ -606,6 +606,8 @@
                 const loading = ref(false);
                 const fetchingHistory = ref(false);
                 const historyList = ref([]);
+                // 全量消息（与 tab 无关），聚合体与待确认计数都基于它，避免切换分类时数字跳动
+                const fullList = ref([]);
                 const aggLoading = ref(false);
                 const aggResult = ref(null);
                 const readTabs = ref(new Set());
@@ -999,7 +1001,7 @@
                 const pendingChanges = ref([]);
                 // 可被修改的目标任务（重要待办里不是"变更消息"的那些）
                 const urgentTargets = computed(() =>
-                    historyList.value.filter((i) => i.data && i.data.category === '重要/紧急待办' && !i.data.is_time_change)
+                    fullList.value.filter((i) => i.data && i.data.category === '重要/紧急待办' && !i.data.is_time_change)
                 );
 
                 const openChangeReview = (src, suggest) => {
@@ -1057,8 +1059,8 @@
 
                 const dynamicAggregations = computed(() => {
                     const groups = {};
-                    
-                    historyList.value.forEach(item => {
+
+                    fullList.value.forEach(item => {
                         const cat = item.data.category;
                         const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
                         
@@ -1449,6 +1451,7 @@
                                 (i) => i.data && i.data.is_time_change && !i.data.change_review
                             );
                             const visible = allItems.filter((i) => !(i.data && i.data.is_time_change));
+                            fullList.value = visible;
 
                             // 按当前 Tab 本地渲染过滤
                             const tab = currentTab.value;
