@@ -83,6 +83,8 @@ class UpdateRequest(BaseModel):
     pickup_code: str | None = None         # 用户为签收通知指定的取件码
     pickup_confirmed: bool | None = None   # 用户已确认这条签收对应哪一件
     pickup_ignored: bool | None = None     # 用户判定"不是我的快递"
+    stale_confirmed: bool | None = None    # 用户确认按滞留件数更新
+    stale_ignored: bool | None = None      # 用户不采用滞留件数
 
 @app.get("/")
 def read_root():
