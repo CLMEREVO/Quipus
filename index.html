@@ -8,14 +8,14 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-[#FAF7F1] text-[#221D16] font-sans">
     <div id="app" class="flex h-[100dvh] md:h-screen overflow-hidden w-full">
         
         <!-- 左侧侧边栏 -->
-        <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between hidden md:flex">
+        <aside class="w-64 bg-[#14110E] text-slate-300 flex flex-col justify-between hidden md:flex">
             <div>
-                <div class="p-6 flex items-center space-x-3 border-b border-slate-800">
-                    <div class="bg-indigo-600 text-white p-2 rounded-lg font-bold text-xl">Q</div>
+                <div class="p-6 flex items-center space-x-3 border-b border-[#2A241C]">
+                    <div class="p-1.5 rounded-lg bg-[#1C1710] border border-[#3A2E1A]"><svg viewBox="0 0 32 32" class="w-8 h-8" fill="none" aria-hidden="true"><defs><linearGradient id="qg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#F2DCAE"/><stop offset="100%" stop-color="#B8860B"/></linearGradient></defs><path d="M4 8h24" stroke="url(#qg)" stroke-width="2.8" stroke-linecap="round"/><path d="M9 8v11" stroke="url(#qg)" stroke-width="2.4" stroke-linecap="round" opacity=".95"/><path d="M16 8v16" stroke="url(#qg)" stroke-width="2.4" stroke-linecap="round"/><path d="M23 8v8" stroke="url(#qg)" stroke-width="2.4" stroke-linecap="round" opacity=".8"/><circle cx="9" cy="21" r="2.5" fill="url(#qg)"/><circle cx="16" cy="26" r="2.7" fill="url(#qg)"/><circle cx="23" cy="18" r="2.3" fill="url(#qg)"/></svg></div>
                     <div>
                         <h1 class="text-white font-bold tracking-wider">Quipus 奇普</h1>
                         <p class="text-xs text-slate-400">智能通知去噪与聚合系统</p>
@@ -23,31 +23,31 @@
                 </div>
                 <nav class="p-4 space-y-1">
                     <div class="space-y-1">
-                        <div @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                             <span>通知概览</span>
                         </div>
-                        <div @click="currentTab = 'urgent'" :class="currentTab === 'urgent' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'urgent'" :class="currentTab === 'urgent' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="bell-ring" class="w-5 h-5"></i>
                             <span>重要/紧急待办</span>
                             <span v-if="stats.urgent > 0 && !readTabs.has('urgent')" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.urgent }}</span>
                         </div>
-                        <div @click="currentTab = 'other'" :class="currentTab === 'other' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'other'" :class="currentTab === 'other' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="layers" class="w-5 h-5"></i>
                             <span>其他类消息</span>
-                            <span v-if="stats.other > 0 && !readTabs.has('other')" class="ml-auto bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.other }}</span>
+                            <span v-if="stats.other > 0 && !readTabs.has('other')" class="ml-auto bg-[#B8860B] text-white text-xs px-2 py-0.5 rounded-full">{{ stats.other }}</span>
                         </div>
-                        <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="shield-alert" class="w-5 h-5"></i>
                             <span>拦截类消息</span>
                             <span v-if="stats.blocked > 0 && !readTabs.has('blocked')" class="ml-auto bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{{ stats.blocked }}</span>
                         </div>
-                        <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="cpu" class="w-5 h-5"></i>
                             <span>聚合体</span>
                             <span v-if="totalPending > 0" class="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{{ totalPending }}</span>
                         </div>
-                        <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
+                        <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'bg-gradient-to-r from-[#C8961E] to-[#E3C46A] text-[#14110E] font-semibold shadow-lg shadow-black/20' : 'hover:bg-[#241E17]'" class="flex items-center space-x-3 px-4 py-3 rounded-lg transition cursor-pointer">
                             <i data-lucide="sliders" class="w-5 h-5"></i>
                             <span>自定义类</span>
                         </div>
@@ -56,12 +56,12 @@
             </div>
             
             <!-- 侧边栏底部：一键恢复测试示例按钮 -->
-            <div class="p-4 border-t border-slate-800 space-y-2">
-                <button @click="refreshSeedData" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
+            <div class="p-4 border-t border-[#2A241C] space-y-2">
+                <button @click="refreshSeedData" class="w-full bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                     <span>一键恢复测试示例</span>
                 </button>
-                <button @click="clearHistory" class="w-full bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
+                <button @click="clearHistory" class="w-full bg-[#241E17] hover:bg-rose-900/60 text-slate-300 hover:text-white text-xs py-2 px-3 rounded-lg transition flex items-center justify-center space-x-2">
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                     <span>清空所有历史通知</span>
                 </button>
@@ -71,8 +71,8 @@
 
         <!-- 右侧主内容区 -->
         <main class="flex-1 min-w-0 flex flex-col overflow-y-auto overflow-x-hidden">
-            <header class="bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3 md:px-8 md:py-4 flex justify-between items-center gap-2 shadow-sm sticky top-0 z-30">
-                <h2 class="text-base md:text-xl font-bold text-slate-800 truncate">
+            <header class="bg-white/95 backdrop-blur border-b border-[#EDE6DA] px-4 py-3 md:px-8 md:py-4 flex justify-between items-center gap-2 shadow-sm sticky top-0 z-30">
+                <h2 class="text-base md:text-xl font-bold text-[#221D16] truncate">
                     <span class="md:hidden">{{ getTabTitle() }}</span>
                     <span class="hidden md:inline">控制台主面板 —— {{ getTabTitle() }}</span>
                 </h2>
@@ -87,39 +87,39 @@
                 
                 <!-- 统计卡片行 -->
                 <div v-show="currentTab === 'overview'" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-                    <div class="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-6 rounded-xl border border-[#EDE6DA] shadow-sm flex items-center justify-between">
                         <div><p class="text-xs md:text-sm text-slate-500">今日已处理</p><h3 class="text-xl md:text-2xl font-bold text-slate-900 mt-1">{{ stats.total }}</h3></div>
-                        <div class="p-2 md:p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="activity" class="w-5 h-5 md:w-6 md:h-6"></i></div>
+                        <div class="p-2 md:p-3 bg-[#FBF3DF] text-[#8A6508] rounded-lg"><i data-lucide="activity" class="w-5 h-5 md:w-6 md:h-6"></i></div>
                     </div>
-                    <div class="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-6 rounded-xl border border-[#EDE6DA] shadow-sm flex items-center justify-between">
                         <div><p class="text-xs md:text-sm text-slate-500">重要消息</p><h3 class="text-xl md:text-2xl font-bold text-amber-600 mt-1">{{ stats.urgent }}</h3></div>
                         <div class="p-2 md:p-3 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="bell-ring" class="w-5 h-5 md:w-6 md:h-6"></i></div>
                     </div>
-                    <div class="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                        <div><p class="text-xs md:text-sm text-slate-500">其他类消息</p><h3 class="text-xl md:text-2xl font-bold text-blue-600 mt-1">{{ stats.other }}</h3></div>
-                        <div class="p-2 md:p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="layers" class="w-5 h-5 md:w-6 md:h-6"></i></div>
+                    <div class="bg-white p-4 md:p-6 rounded-xl border border-[#EDE6DA] shadow-sm flex items-center justify-between">
+                        <div><p class="text-xs md:text-sm text-slate-500">其他类消息</p><h3 class="text-xl md:text-2xl font-bold text-[#B8860B] mt-1">{{ stats.other }}</h3></div>
+                        <div class="p-2 md:p-3 bg-[#FBF3DF] text-[#8A6508] rounded-lg"><i data-lucide="layers" class="w-5 h-5 md:w-6 md:h-6"></i></div>
                     </div>
-                    <div class="bg-white p-4 md:p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="bg-white p-4 md:p-6 rounded-xl border border-[#EDE6DA] shadow-sm flex items-center justify-between">
                         <div><p class="text-xs md:text-sm text-slate-500">已拦截</p><h3 class="text-xl md:text-2xl font-bold text-rose-600 mt-1">{{ stats.blocked }}</h3></div>
                         <div class="p-2 md:p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="ban" class="w-5 h-5 md:w-6 md:h-6"></i></div>
                     </div>
                 </div>
 
                 <!-- 模拟输入与清洗区 -->
-                <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i> 模拟手机通知输入区
+                <div v-show="currentTab === 'overview'" class="bg-white rounded-xl border border-[#EDE6DA] shadow-sm p-4 md:p-6 space-y-4">
+                    <h3 class="font-bold text-[#221D16] flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-[#8A6508]"></i> 模拟手机通知输入区
                     </h3>
-                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：淘宝 促销 / 快递到站提醒..." class="w-full p-3 md:p-4 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
+                    <textarea v-model="inputText" rows="3" placeholder="粘贴通知，例如：淘宝 促销 / 快递到站提醒..." class="w-full p-3 md:p-4 border border-[#EDE6DA] rounded-lg focus:ring-2 focus:ring-[#B8860B] focus:outline-none text-sm"></textarea>
                     
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div class="flex flex-wrap gap-2">
                             <span class="text-xs text-slate-500 self-center">快捷样例：</span>
-                            <button @click="loadSample(1)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">1.停水通知</button>
-                            <button @click="loadSample(2)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">2.作业截止</button>
-                            <button @click="loadSample(3)" class="text-xs bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded">3.晨跑刷脸</button>
+                            <button @click="loadSample(1)" class="text-xs bg-[#F3EEE4] hover:bg-[#E9E2D4] px-2.5 py-1.5 rounded">1.停水通知</button>
+                            <button @click="loadSample(2)" class="text-xs bg-[#F3EEE4] hover:bg-[#E9E2D4] px-2.5 py-1.5 rounded">2.作业截止</button>
+                            <button @click="loadSample(3)" class="text-xs bg-[#F3EEE4] hover:bg-[#E9E2D4] px-2.5 py-1.5 rounded">3.晨跑刷脸</button>
                         </div>
-                        <button @click="submitNotification" :disabled="loading" class="w-full md:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition flex items-center space-x-2 disabled:opacity-50">
+                        <button @click="submitNotification" :disabled="loading" class="w-full md:w-auto justify-center bg-[#B8860B] hover:bg-[#9C7209] text-white font-medium px-6 py-2.5 rounded-lg transition flex items-center space-x-2 disabled:opacity-50">
                             <span v-if="loading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
                             <span>{{ loading ? 'AI 清洗中...' : '智能清洗通知' }}</span>
                         </button>
@@ -128,34 +128,34 @@
                     <!-- 全局聚合 Demo 按钮区 -->
                     <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div class="text-xs text-slate-500">多源碎片通知一键聚合演示 (Demo)：根据当前提交的所有通知动态生成摘要</div>
-                        <button @click="runGlobalAggregation" :disabled="aggLoading" class="w-full md:w-auto justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex items-center space-x-2">
+                        <button @click="runGlobalAggregation" :disabled="aggLoading" class="w-full md:w-auto justify-center px-4 py-2 bg-[#221D16] hover:bg-[#3A2E22] text-white text-xs font-medium rounded-lg transition flex items-center space-x-2">
                             <span v-if="aggLoading" class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
                             <span>{{ aggLoading ? "AI 聚合中..." : "一键生成全局聚合摘要" }}</span>
                         </button>
                     </div>
 
                     <!-- 演示聚合小卡片：稳定展示 -->
-                    <div v-if="aggResult" class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                        <h4 class="font-bold text-sm text-slate-800 mb-1">📦 {{ aggResult.title }}</h4>
+                    <div v-if="aggResult" class="p-4 bg-gradient-to-br from-[#FBF3DF] to-[#FAF7F1] rounded-lg border border-[#E8D9B5]">
+                        <h4 class="font-bold text-sm text-[#221D16] mb-1">📦 {{ aggResult.title }}</h4>
                         <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
                     </div>
 
                     <!-- 移动端：演示控制按钮（桌面端在左侧边栏） -->
                     <div class="md:hidden flex gap-2 pt-3 border-t border-slate-100">
-                        <button @click="refreshSeedData" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded-lg transition flex items-center justify-center space-x-1.5">
+                        <button @click="refreshSeedData" class="flex-1 bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs py-2 rounded-lg transition flex items-center justify-center space-x-1.5">
                             <i data-lucide="refresh-cw" class="w-4 h-4"></i><span>恢复测试示例</span>
                         </button>
-                        <button @click="clearHistory" class="flex-1 bg-slate-800 hover:bg-rose-900/60 text-white text-xs py-2 rounded-lg transition flex items-center justify-center space-x-1.5">
+                        <button @click="clearHistory" class="flex-1 bg-[#241E17] hover:bg-rose-900/60 text-white text-xs py-2 rounded-lg transition flex items-center justify-center space-x-1.5">
                             <i data-lucide="trash-2" class="w-4 h-4"></i><span>清空历史</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- 聚合体看板视图 -->
-                <div v-if="currentTab === 'express'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
+                <div v-if="currentTab === 'express'" class="bg-white rounded-xl border border-[#EDE6DA] shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
                     <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 border-b pb-4">
-                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> Quipus 全局多源实时聚合看板
+                        <h3 class="font-bold text-[#221D16] flex items-center gap-2">
+                            <i data-lucide="cpu" class="w-5 h-5 text-[#B8860B]"></i> Quipus 全局多源实时聚合看板
                         </h3>
                         <span class="text-xs text-slate-400">自动根据 event_key 聚合高频事件</span>
                     </div>
@@ -167,28 +167,28 @@
                         <div v-for="group in dynamicAggregations" :key="group.key"
                              :class="{
                                 'from-rose-50/90 to-pink-50/70 border-rose-200': group.kind === 'urgent',
-                                'from-amber-50/80 to-indigo-50/70 border-amber-200': group.kind === 'payment',
-                                'from-indigo-50/80 to-amber-50/70 border-indigo-200': group.kind === 'other',
-                                'from-slate-100/90 to-slate-50/70 border-slate-200': group.kind === 'blocked'
+                                'from-[#FFF3E4]/85 to-[#FFFBF5]/70 border-[#EBD5B4]': group.kind === 'payment',
+                                'from-[#FFF9E6]/85 to-[#FFFBEF]/70 border-[#EADFBB]': group.kind === 'other',
+                                'from-slate-100/90 to-slate-50/70 border-[#EDE6DA]': group.kind === 'blocked'
                              }"
                              class="p-4 md:p-5 rounded-xl border shadow-sm space-y-2.5 md:space-y-3 bg-gradient-to-br">
 
                             <!-- 支付/消费：一张卡汇总所有笔数与金额 -->
                             <template v-if="group.kind === 'payment'">
                                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                    <span class="font-bold text-sm text-[#3A2E18] flex items-center gap-2">
                                         <i data-lucide="wallet" class="w-4 h-4"></i> {{ group.key }}
                                     </span>
-                                    <span class="text-[10px] md:text-xs bg-white/70 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                    <span class="text-[10px] md:text-xs bg-white/70 text-[#6B5312] px-2 py-0.5 rounded-full font-bold">
                                         共 {{ group.businessCount }} 笔<template v-if="group.mergedCount > 0"> · 去重 {{ group.mergedCount }} 条同源推送</template>
                                     </span>
-                                    <button @click.stop="openManual()" class="text-[10px] text-slate-400 hover:text-indigo-600">＋手动记账</button>
+                                    <button @click.stop="openManual()" class="text-[10px] text-slate-400 hover:text-[#8A6508]">＋手动记账</button>
                                 </div>
 
                                 <div class="flex items-end gap-5 flex-wrap">
                                     <div>
                                         <div class="text-[10px] md:text-xs text-slate-500 mb-0.5">今日支出</div>
-                                        <span class="text-2xl md:text-3xl font-bold text-indigo-900 leading-none tabular-nums">¥{{ group.totalAmount.toFixed(2) }}</span>
+                                        <span class="text-2xl md:text-3xl font-bold text-[#3A2E18] leading-none tabular-nums">¥{{ group.totalAmount.toFixed(2) }}</span>
                                     </div>
                                     <div v-if="group.incomeTotal > 0">
                                         <div class="text-[10px] md:text-xs text-slate-500 mb-0.5">今日收入</div>
@@ -196,17 +196,17 @@
                                     </div>
                                 </div>
 
-                                <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
+                                <div class="rounded-lg bg-white/60 divide-y divide-[#F0E6CE]">
                                     <div v-for="(tx, i) in group.txns.slice(0, 5)" :key="i" class="flex items-center gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
                                         <span class="flex-1 min-w-0 truncate text-slate-700 font-medium">{{ tx.apps.join(' + ') }}</span>
                                         <span v-if="tx.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                         <span class="shrink-0 text-slate-400 tabular-nums">{{ tx.time }}</span>
                                         <span class="shrink-0 font-bold tabular-nums"
-                                              :class="tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-800'">
+                                              :class="tx.direction === 'income' ? 'text-emerald-600' : 'text-[#221D16]'">
                                             {{ tx.direction === 'income' ? '+' : '−' }}¥{{ tx.amount.toFixed(2) }}
                                         </span>
                                         <button @click.stop="openTxnEdit(tx)" title="编辑金额 / 收支方向"
-                                                class="shrink-0 text-[10px] text-slate-300 hover:text-indigo-600">编辑</button>
+                                                class="shrink-0 text-[10px] text-slate-300 hover:text-[#8A6508]">编辑</button>
                                     </div>
                                     <div v-if="group.txns.length > 5" class="px-2.5 py-1.5 text-[10px] text-slate-400">
                                         还有 {{ group.txns.length - 5 }} 笔未展开…
@@ -219,30 +219,30 @@
                             <!-- 其他类：快递置顶，其余消息依次往下 -->
                             <template v-else-if="group.kind === 'other'">
                                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                    <span class="font-bold text-sm text-[#3A2E18] flex items-center gap-2">
                                         <i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}
                                     </span>
                                     <button @click="currentTab = 'other'"
                                             title="跳转到「其他类消息」查看全部"
-                                            class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold hover:bg-indigo-300 transition">
+                                            class="text-[10px] md:text-xs bg-[#F3E7C4] text-[#6B5312] px-2 py-0.5 rounded-full font-bold hover:bg-[#EBD9AE] transition">
                                         <template v-if="group.express">{{ group.express.count }} 件快递 · </template>{{ group.totalOtherMessages }} 条消息
                                     </button>
                                     <span v-if="expressPendingCount > 0"
                                           class="text-[10px] md:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
                                         待确认 {{ expressPendingCount }}
                                     </span>
-                                    <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
+                                    <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-[#8A6508]">全部已读</button>
                                 </div>
 
                                 <!-- 快递置顶：只留取件码和时间，来源折叠 -->
-                                <div v-if="group.express" class="rounded-lg bg-white/70 border border-indigo-100 p-2 space-y-1.5">
+                                <div v-if="group.express" class="rounded-lg bg-white/70 border border-[#F0E6CE] p-2 space-y-1.5">
                                     <div class="flex items-center gap-2 flex-wrap text-[11px] md:text-xs">
-                                        <i data-lucide="package" class="w-3.5 h-3.5 text-indigo-600"></i>
-                                        <span class="font-bold text-slate-800">待取快递 {{ group.express.count }} 件</span>
+                                        <i data-lucide="package" class="w-3.5 h-3.5 text-[#8A6508]"></i>
+                                        <span class="font-bold text-[#221D16]">待取快递 {{ group.express.count }} 件</span>
                                         <span v-if="group.express.seed" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
-                                        <span v-if="purchasedCount > 0" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">已购 {{ purchasedCount }} 件</span>
+                                        <span v-if="purchasedCount > 0" class="text-[10px] px-1.5 py-0.5 rounded bg-[#F3EEE4] text-slate-600 font-medium">已购 {{ purchasedCount }} 件</span>
                                         <span v-if="group.express.mergedCount > 0" class="text-[10px] text-slate-400">去重 {{ group.express.mergedCount }} 条</span>
-                                        <button @click.stop="setPurchasedCount()" class="ml-auto text-[10px] text-slate-400 hover:text-indigo-600">设置已购件数</button>
+                                        <button @click.stop="setPurchasedCount()" class="ml-auto text-[10px] text-slate-400 hover:text-[#8A6508]">设置已购件数</button>
                                     </div>
 
                                     <!-- 滞留提醒：件数改不改由用户决定 -->
@@ -257,7 +257,7 @@
                                                 确认改为 {{ st.count }} 件
                                             </button>
                                             <button @click.stop="ignoreStale(st.id)"
-                                                    class="px-2 py-1 bg-white border border-slate-300 text-slate-600 text-[10px] rounded hover:bg-slate-100">
+                                                    class="px-2 py-1 bg-white border border-slate-300 text-slate-600 text-[10px] rounded hover:bg-[#F3EEE4]">
                                                 不用
                                             </button>
                                         </div>
@@ -274,7 +274,7 @@
                                                 {{ p.code || '无码包裹' }}
                                             </button>
                                             <button @click.stop="ignorePickup(pk.id)"
-                                                    class="px-2 py-1 bg-white border border-slate-300 text-slate-600 text-[10px] rounded hover:bg-slate-100">
+                                                    class="px-2 py-1 bg-white border border-slate-300 text-slate-600 text-[10px] rounded hover:bg-[#F3EEE4]">
                                                 不是我的
                                             </button>
                                         </div>
@@ -288,12 +288,12 @@
                                 </div>
 
                                 <!-- 其余消息（保留应用名） -->
-                                <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
+                                <div class="rounded-lg bg-white/60 divide-y divide-[#F0E6CE]">
                                     <div v-for="r in group.rows.slice(0, 6)" :key="(r.ids && r.ids[0]) || r.title"
                                          class="px-2.5 py-2 text-[11px] md:text-xs space-y-0.5">
                                         <div class="flex items-center gap-2">
                                             <span class="text-[10px] text-slate-400 shrink-0">{{ r.app }}</span>
-                                            <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ r.title }}</span>
+                                            <span class="font-medium text-[#221D16] flex-1 min-w-0 truncate">{{ r.title }}</span>
                                             <span v-if="r.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                             <span v-if="r.count > 1" class="shrink-0 text-[10px] text-slate-400">×{{ r.count }}</span>
                                             <span class="shrink-0 text-slate-400 tabular-nums">{{ r.time }}</span>
@@ -312,17 +312,17 @@
                             <!-- 重要待办：一卡分条，待确认变更置顶 -->
                             <template v-else-if="group.kind === 'urgent'">
                                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                    <span class="font-bold text-sm text-[#3A2E18] flex items-center gap-2">
                                         <i data-lucide="bell-ring" class="w-4 h-4"></i> {{ group.key }}
                                     </span>
-                                    <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                    <span class="text-[10px] md:text-xs bg-[#F3E7C4] text-[#6B5312] px-2 py-0.5 rounded-full font-bold">
                                         共 {{ group.businessCount }} 条
                                     </span>
                                     <span v-if="pendingChanges.length > 0"
                                           class="text-[10px] md:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
                                         待确认 {{ pendingChanges.length }}
                                     </span>
-                                    <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
+                                    <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-[#8A6508]">全部已读</button>
                                 </div>
 
                                 <!-- 待用户确认的时间变更 -->
@@ -345,7 +345,7 @@
                                             有变更，但不是这条
                                         </button>
                                         <button @click="ignoreChange(c)"
-                                                class="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-[11px] rounded-lg hover:bg-slate-100 transition">
+                                                class="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-[11px] rounded-lg hover:bg-[#F3EEE4] transition">
                                             不是变更
                                         </button>
                                     </div>
@@ -355,7 +355,7 @@
                                     <div v-for="t in group.items.slice(0, 6)" :key="t.id" class="px-2.5 py-2 text-[11px] md:text-xs space-y-0.5">
                                         <div class="flex items-center gap-2">
                                             <span class="text-[10px] text-slate-400 shrink-0">{{ t.app }}</span>
-                                            <span class="font-medium text-slate-800 flex-1 min-w-0 truncate">{{ t.title }}</span>
+                                            <span class="font-medium text-[#221D16] flex-1 min-w-0 truncate">{{ t.title }}</span>
                                             <span v-if="t.seed" class="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 leading-none">测试用</span>
                                             <span v-if="t.changed" class="shrink-0 text-[10px] text-rose-600 font-bold">变更</span>
                                             <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
@@ -398,8 +398,8 @@
                             <!-- 其它类型：保持原样 -->
                             <template v-else>
                                 <div class="flex items-center justify-between gap-2 flex-wrap">
-                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}</span>
-                                    <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">已自动聚合 {{ group.businessCount }} 项核心事件</span>
+                                    <span class="font-bold text-sm text-[#3A2E18] flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> {{ group.key }}</span>
+                                    <span class="text-[10px] md:text-xs bg-[#F3E7C4] text-[#6B5312] px-2 py-0.5 rounded-full font-bold">已自动聚合 {{ group.businessCount }} 项核心事件</span>
                                 </div>
                                 <p class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
                                 <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
@@ -409,17 +409,17 @@
                 </div>
 
                 <!-- 自定义规则管理视图 -->
-                <div v-if="currentTab === 'custom'" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
+                <div v-if="currentTab === 'custom'" class="bg-white rounded-xl border border-[#EDE6DA] shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
                     <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-2 border-b pb-4">
-                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                            <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i> 用户自定义通知干预规则
+                        <h3 class="font-bold text-[#221D16] flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-5 h-5 text-[#8A6508]"></i> 用户自定义通知干预规则
                         </h3>
                         <button @click="resetRules" class="self-start md:self-auto px-3 py-1.5 bg-rose-100 text-rose-700 text-xs font-medium rounded-lg hover:bg-rose-200 transition">
                             恢复默认设置
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 p-3 md:p-4 bg-slate-50 rounded-lg border">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 p-3 md:p-4 bg-[#FAF7F1] rounded-lg border">
                         <input v-model="newRule.app" type="text" placeholder="App名称（可选，如 企业微信）" class="p-2 border rounded text-xs">
                         <input v-model="newRule.keyword" type="text" placeholder="必填关键词（如 行业资讯）" class="p-2 border rounded text-xs">
                         <select v-model="newRule.targetCat" class="p-2 border rounded text-xs">
@@ -427,7 +427,7 @@
                             <option value="其他类消息">定义为：其他类消息</option>
                             <option value="无效广告/促销">定义为：拦截类消息</option>
                         </select>
-                        <button @click="addRule" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded font-medium transition">
+                        <button @click="addRule" class="bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs py-2 rounded font-medium transition">
                             添加自定义
                         </button>
                     </div>
@@ -437,9 +437,9 @@
                         <div v-if="ruleList.length === 0" class="text-xs text-slate-400 py-6 text-center">暂无自定义规则，系统完全由 AI 默认去噪。</div>
                         <div v-for="rule in ruleList" :key="rule.id" class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 bg-white border rounded-lg text-xs shadow-sm">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-bold bg-slate-900 text-white px-2 py-0.5 rounded">{{ rule.app_keyword || '全局App' }}</span>
-                                <span class="text-slate-600">包含关键词：<b class="text-indigo-600">"{{ rule.text_keyword }}"</b></span>
-                                <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">重定向至：{{ rule.target_cat }}</span>
+                                <span class="font-bold bg-[#14110E] text-white px-2 py-0.5 rounded">{{ rule.app_keyword || '全局App' }}</span>
+                                <span class="text-slate-600">包含关键词：<b class="text-[#8A6508]">"{{ rule.text_keyword }}"</b></span>
+                                <span class="px-2 py-0.5 rounded bg-[#FBF3DF] text-[#6B5312] font-medium">重定向至：{{ rule.target_cat }}</span>
                             </div>
                             <button @click="deleteRule(rule.id)" class="text-rose-600 hover:underline self-end md:self-auto">删除</button>
                         </div>
@@ -448,28 +448,28 @@
 
                 <!-- 实时通知流展示区 -->
                 <div v-if="currentTab !== 'express' && currentTab !== 'custom'" class="space-y-4">
-                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
+                    <h3 class="font-bold text-[#221D16] flex items-center gap-2">
+                        <i data-lucide="layers" class="w-5 h-5 text-[#8A6508]"></i> 实时通知流与结构化看板
                     </h3>
 
                     <!-- 待确认的重要任务时间变更（已移入聚合体的「重要待办」卡片） -->
 
-                    <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">正在加载数据...</div>
-                    <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">当前分类下暂无通知记录。</div>
+                    <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-[#EDE6DA] text-slate-400">正在加载数据...</div>
+                    <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-[#EDE6DA] text-slate-400">当前分类下暂无通知记录。</div>
 
                     <div v-else class="space-y-3">
                         <div v-for="(item, index) in historyList" :key="item.id || index" 
                              :class="{
                                 'border-rose-300 bg-rose-50/40': item.data.category === '无效广告/促销' || item.data.category === '拦截类消息',
                                 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/20': item.data.is_urgent || item.data.category === '重要/紧急待办',
-                                'border-blue-300 bg-blue-50/40': item.data.category === '其他类' || item.data.category === '物流与消费',
-                                'border-slate-200 bg-white': !item.data.is_urgent && item.data.category !== '重要/紧急待办'
+                                'border-[#E8D9B5] bg-[#FFFBEF]/50': item.data.category === '其他类' || item.data.category === '物流与消费',
+                                'border-[#EDE6DA] bg-white': !item.data.is_urgent && item.data.category !== '重要/紧急待办'
                             }"
                              class="p-4 md:p-5 rounded-xl border shadow-sm transition hover:shadow-md">
                             
                             <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
                                 <div class="flex items-center flex-wrap gap-2 min-w-0">
-                                    <span class="font-bold text-xs md:text-sm bg-slate-900 text-white px-2 md:px-2.5 py-0.5 rounded whitespace-nowrap">{{ item.data.app_name }}</span>
+                                    <span class="font-bold text-xs md:text-sm bg-[#14110E] text-white px-2 md:px-2.5 py-0.5 rounded whitespace-nowrap">{{ item.data.app_name }}</span>
                                     <span class="text-[11px] md:text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap"
                                         :class="{
                                             'bg-amber-100 text-amber-800': item.data.category === '重要/紧急待办',
@@ -499,33 +499,33 @@
         </main>
 
         <!-- 移动端底部导航（桌面端隐藏） -->
-        <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900 border-t border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] pb-[env(safe-area-inset-bottom)]">
+        <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#14110E] border-t border-[#2A241C] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] pb-[env(safe-area-inset-bottom)]">
             <div class="grid grid-cols-6">
-                <div @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">概览</span>
                 </div>
-                <div @click="currentTab = 'urgent'" :class="currentTab === 'urgent' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'urgent'" :class="currentTab === 'urgent' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="bell-ring" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">待办</span>
                     <span v-if="stats.urgent > 0 && !readTabs.has('urgent')" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-white text-[9px] leading-[15px] text-center">{{ stats.urgent }}</span>
                 </div>
-                <div @click="currentTab = 'other'" :class="currentTab === 'other' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'other'" :class="currentTab === 'other' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="layers" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">其他</span>
-                    <span v-if="stats.other > 0 && !readTabs.has('other')" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-blue-500 text-white text-[9px] leading-[15px] text-center">{{ stats.other }}</span>
+                    <span v-if="stats.other > 0 && !readTabs.has('other')" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-[#B8860B] text-white text-[9px] leading-[15px] text-center">{{ stats.other }}</span>
                 </div>
-                <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'blocked'" :class="currentTab === 'blocked' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="shield-alert" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">拦截</span>
                     <span v-if="stats.blocked > 0 && !readTabs.has('blocked')" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] leading-[15px] text-center">{{ stats.blocked }}</span>
                 </div>
-                <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'express'" :class="currentTab === 'express' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="cpu" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">聚合</span>
                     <span v-if="totalPending > 0" class="absolute top-0.5 right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-amber-500 text-white text-[9px] leading-[15px] text-center">{{ totalPending }}</span>
                 </div>
-                <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'text-white bg-slate-800' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
+                <div @click="currentTab = 'custom'" :class="currentTab === 'custom' ? 'text-white bg-[#241E17]' : 'text-slate-400'" class="relative flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition">
                     <i data-lucide="sliders" class="w-5 h-5"></i>
                     <span class="text-[10px] leading-none">自定义</span>
                 </div>
@@ -533,9 +533,9 @@
         </nav>
 
         <!-- 时间变更确认弹窗 -->
-        <div v-if="reviewOpen" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div v-if="reviewOpen" class="fixed inset-0 z-50 bg-[#14110E]/50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl w-full max-w-lg p-5 space-y-3 shadow-xl">
-                <h3 class="font-bold text-slate-800">确认要修改的任务</h3>
+                <h3 class="font-bold text-[#221D16]">确认要修改的任务</h3>
                 <p class="text-xs text-slate-500">来源消息：{{ reviewSource && reviewSource.data ? reviewSource.data.title : '' }}</p>
                 <select v-model="reviewTargetId" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
                     <option :value="null">请选择要修改的任务</option>
@@ -546,16 +546,16 @@
                 <div class="flex justify-end gap-2">
                     <button @click="reviewOpen = false" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">取消</button>
                     <button @click="applyReview" :disabled="!reviewTargetId || !reviewSummary.trim()"
-                            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg disabled:opacity-40 transition">
+                            class="px-4 py-1.5 bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs rounded-lg disabled:opacity-40 transition">
                         确认修改
                     </button>
                 </div>
             </div>
         </div>
         <!-- 支付明细编辑弹窗 -->
-        <div v-if="txnEditOpen" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div v-if="txnEditOpen" class="fixed inset-0 z-50 bg-[#14110E]/50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl w-full max-w-sm p-5 space-y-3 shadow-xl">
-                <h3 class="font-bold text-slate-800">编辑这笔账</h3>
+                <h3 class="font-bold text-[#221D16]">编辑这笔账</h3>
                 <p class="text-xs text-slate-500">改完会重新统计今日支出与收入。</p>
                 <select v-model="txnEditDirection" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
                     <option value="expense">支出</option>
@@ -565,15 +565,15 @@
                        class="w-full border border-slate-300 rounded-lg p-2 text-sm">
                 <div class="flex justify-end gap-2">
                     <button @click="txnEditOpen = false" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">取消</button>
-                    <button @click="submitTxnEdit" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg transition">保存</button>
+                    <button @click="submitTxnEdit" class="px-4 py-1.5 bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs rounded-lg transition">保存</button>
                 </div>
             </div>
         </div>
 
         <!-- 手动记账弹窗 -->
-        <div v-if="manualOpen" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div v-if="manualOpen" class="fixed inset-0 z-50 bg-[#14110E]/50 flex items-center justify-center p-4">
             <div class="bg-white rounded-xl w-full max-w-sm p-5 space-y-3 shadow-xl">
-                <h3 class="font-bold text-slate-800">手动记账</h3>
+                <h3 class="font-bold text-[#221D16]">手动记账</h3>
                 <p class="text-xs text-slate-500">记录手机账单里没有的收支，会单独列为一条。</p>
                 <select v-model="manualDirection" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
                     <option value="expense">支出</option>
@@ -585,7 +585,7 @@
                        class="w-full border border-slate-300 rounded-lg p-2 text-sm">
                 <div class="flex justify-end gap-2">
                     <button @click="manualOpen = false" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">取消</button>
-                    <button @click="submitManual" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg transition">记一笔</button>
+                    <button @click="submitManual" class="px-4 py-1.5 bg-[#B8860B] hover:bg-[#9C7209] text-white text-xs rounded-lg transition">记一笔</button>
                 </div>
             </div>
         </div>
