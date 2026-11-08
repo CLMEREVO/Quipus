@@ -13,6 +13,7 @@ from storage import (
     TAB_TO_CATEGORY,
     clear,
     delete_notification,
+    update_notification,
     list_notifications,
     save_notification,
     stats,
@@ -66,6 +67,17 @@ class RuleRequest(BaseModel):
     app_keyword: str = ""
     text_keyword: str = Field(..., min_length=1)
     target_cat: str = Field(..., min_length=1)
+
+class UpdateRequest(BaseModel):
+    """用户确认时间变更后，对通知做增量改写。"""
+    title: str | None = None
+    summary: str | None = None
+    deadline: str | None = None
+    change_review: str | None = None       # pending / applied / ignored
+    change_target_id: int | None = None
+    change_note: str | None = None
+    direction: str | None = None           # expense / income，手动改向
+    amount: float | None = None
 
 @app.get("/")
 def read_root():
@@ -127,6 +139,16 @@ def delete_one(item_id: int):
     if not removed:
         raise HTTPException(status_code=404, detail="通知不存在或已被删除")
     return {"status": "success", "deleted_id": item_id}    
+
+@app.patch("/api/history/{item_id}")
+def patch_notification(item_id: int, data: UpdateRequest):
+    patch = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="没有需要更新的字段")
+    updated = update_notification(item_id, patch)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="通知不存在")
+    return {"status": "success", **updated}
 
 @app.post("/api/seed/refresh")
 def refresh_seed():

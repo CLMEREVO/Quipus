@@ -66,6 +66,7 @@ def apply_custom_rules(app_name: str, raw_text: str, result: dict[str, Any]) -> 
             if app_matched and text_matched:
                 result["category"] = r["target_cat"]
                 result["is_urgent"] = bool(r["is_urgent"])
+                result["custom_rule"] = True
                 result["summary"] = f"[自定义] {result.get('summary', '')}"
                 break
     return result
@@ -208,6 +209,30 @@ def delete_notification(item_id: int) -> int:
         return before - after
     finally:
         conn.close()
+
+def update_notification(item_id: int, patch: dict[str, Any]) -> dict[str, Any] | None:
+    """把 patch 合并进某条通知的 result_json（用于用户确认时间变更后改写）。"""
+    with closing(_connect()) as conn:
+        with conn:
+            row = conn.execute("SELECT * FROM notifications WHERE id = ?", (item_id,)).fetchone()
+            if row is None:
+                return None
+            data = json.loads(row["result_json"])
+            for key, value in patch.items():
+                if value is not None:
+                    data[key] = value
+            conn.execute(
+                "UPDATE notifications SET result_json = ?, title = ?, category = ?, is_urgent = ? WHERE id = ?",
+                (
+                    json.dumps(data, ensure_ascii=False),
+                    str(data.get("title") or row["title"]),
+                    str(data.get("category") or row["category"]),
+                    1 if data.get("is_urgent") else 0,
+                    item_id,
+                ),
+            )
+    return {"id": item_id, "created_at": row["created_at"], "original": row["raw_text"], "data": data}
+
 
 def get_custom_rules() -> list[dict[str, Any]]:
     with closing(_connect()) as conn:

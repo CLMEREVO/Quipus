@@ -197,6 +197,9 @@
                                               :class="tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-800'">
                                             {{ tx.direction === 'income' ? '+' : '−' }}¥{{ tx.amount.toFixed(2) }}
                                         </span>
+                                        <button @click.stop="toggleTxnDirection(tx)"
+                                                :title="tx.direction === 'income' ? '改为支出' : '改为收入'"
+                                                class="shrink-0 text-[10px] text-slate-300 hover:text-indigo-600">改</button>
                                     </div>
                                     <div v-if="group.txns.length > 5" class="px-2.5 py-1.5 text-[10px] text-slate-400">
                                         还有 {{ group.txns.length - 5 }} 笔未展开…
@@ -204,6 +207,85 @@
                                 </div>
 
                                 <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                            </template>
+
+                            <!-- 快递：逐件列出取件码 -->
+                            <template v-else-if="group.kind === 'express'">
+                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                        <i data-lucide="package" class="w-4 h-4"></i> {{ group.key }}
+                                    </span>
+                                    <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                        共 {{ group.businessCount }} 件<template v-if="group.mergedCount > 0"> · 去重 {{ group.mergedCount }} 条</template>
+                                    </span>
+                                </div>
+                                <div v-if="group.parcels.length" class="rounded-lg bg-white/60 divide-y divide-indigo-100">
+                                    <div v-for="(p, i) in group.parcels.slice(0, 4)" :key="i" class="flex items-center gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
+                                        <span class="shrink-0 font-bold text-slate-800 tabular-nums">{{ p.code || '待出码' }}</span>
+                                        <span class="flex-1 min-w-0 truncate text-slate-600">{{ p.apps.join(' + ') }}</span>
+                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ p.time }}</span>
+                                    </div>
+                                    <div v-if="group.parcels.length > 4" class="px-2.5 py-1.5 text-[10px] text-slate-400">
+                                        还有 {{ group.parcels.length - 4 }} 件未展开…
+                                    </div>
+                                </div>
+                                <p v-else class="text-xs text-slate-600">最新状态：{{ group.lastSummary }}</p>
+                                <div v-if="group.stationCount > 0" class="text-[10px] text-amber-600">
+                                    驿站提示：当前有 {{ group.stationCount }} 件滞留超 24 小时
+                                </div>
+                                <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                            </template>
+
+                            <!-- 重要待办：一卡分条，最新的在上面 -->
+                            <template v-else-if="group.kind === 'urgent'">
+                                <div class="flex items-center justify-between gap-2 flex-wrap">
+                                    <span class="font-bold text-sm text-indigo-900 flex items-center gap-2">
+                                        <i data-lucide="bell-ring" class="w-4 h-4"></i> {{ group.key }}
+                                    </span>
+                                    <span class="text-[10px] md:text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                                        共 {{ group.businessCount }} 条
+                                    </span>
+                                    <button @click="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-indigo-600">全部已读</button>
+                                </div>
+                                <div class="rounded-lg bg-white/60 divide-y divide-indigo-100">
+                                    <div v-for="(t, i) in group.items.slice(0, 4)" :key="t.id" class="flex items-start gap-2 px-2.5 py-1.5 text-[11px] md:text-xs">
+                                        <span class="flex-1 min-w-0">
+                                            <span class="font-medium text-slate-800">{{ t.title }}</span>
+                                            <span v-if="t.changed" class="ml-1 text-[10px] text-rose-600 font-bold">变更</span>
+                                        </span>
+                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
+                                        <button @click.stop="removeNotification(t.id)" title="标记已读（删除）"
+                                                class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+                                    </div>
+                                    <div v-if="group.items.length > 4" class="px-2.5 py-1.5 text-[10px] text-slate-400">
+                                        还有 {{ group.items.length - 4 }} 条未展开…
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-400">最新发生时间：{{ group.lastTime }}</div>
+                            </template>
+
+                            <!-- 拦截类：小卡，只显示数量，点开看消息 -->
+                            <template v-else-if="group.kind === 'blocked'">
+                                <div class="flex items-center justify-between gap-2 cursor-pointer select-none" @click="toggleBlocked(group.key)">
+                                    <span class="font-bold text-sm text-rose-700 flex items-center gap-2">
+                                        <i data-lucide="shield-alert" class="w-4 h-4"></i> {{ group.key }}
+                                    </span>
+                                    <span class="text-[10px] md:text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">
+                                        {{ group.businessCount }} 条
+                                    </span>
+                                    <button @click.stop="markAllRead(group)" class="text-[10px] text-slate-400 hover:text-rose-600">全部已读</button>
+                                </div>
+                                <div v-if="expandedBlocked.has(group.key)" class="rounded-lg bg-white/70 divide-y divide-rose-100 max-h-60 overflow-y-auto">
+                                    <div v-for="t in group.items.slice(0, 20)" :key="t.id" class="flex items-center gap-2 px-2 py-1.5 text-[11px] md:text-xs">
+                                        <span class="shrink-0 font-medium text-slate-700">{{ t.app }}</span>
+                                        <span class="flex-1 min-w-0 truncate text-slate-500">{{ t.title }}</span>
+                                        <span class="shrink-0 text-slate-400 tabular-nums">{{ t.time }}</span>
+                                        <button @click.stop="removeNotification(t.id)" title="标记已读（删除）"
+                                                class="shrink-0 text-slate-300 hover:text-rose-600 px-1">×</button>
+                                    </div>
+                                    <div v-if="group.items.length > 20" class="px-2 py-1 text-[10px] text-slate-400">仅显示最近 20 条…</div>
+                                </div>
+                                <div v-else class="text-[10px] text-slate-400">点击展开最近拦截的消息</div>
                             </template>
 
                             <!-- 其它类型：保持原样 -->
@@ -262,7 +344,32 @@
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
                         <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i> 实时通知流与结构化看板
                     </h3>
-                    
+
+                    <!-- 待确认的重要任务时间变更 -->
+                    <div v-for="c in pendingChanges" :key="'chg-' + c.id"
+                         class="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-2">
+                        <div class="flex items-center gap-2 text-sm font-bold text-amber-900">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i> 检测到可能的任务时间变更
+                        </div>
+                        <p class="text-xs text-amber-800">
+                            「{{ c.data.title }}」<template v-if="c.data.related_task">，可能是「{{ c.data.related_task }}」</template><template v-else>，但没能识别出是哪条任务</template>
+                        </p>
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <button @click="openChangeReview(c, true)"
+                                    class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg transition">
+                                是，修改这条任务
+                            </button>
+                            <button @click="openChangeReview(c, false)"
+                                    class="px-3 py-1.5 bg-white border border-amber-400 text-amber-800 text-xs rounded-lg hover:bg-amber-100 transition">
+                                有变更，但不是这条
+                            </button>
+                            <button @click="ignoreChange(c)"
+                                    class="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs rounded-lg hover:bg-slate-100 transition">
+                                不是变更
+                            </button>
+                        </div>
+                    </div>
+
                     <div v-if="fetchingHistory" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">正在加载数据...</div>
                     <div v-else-if="historyList.length === 0" class="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-400">当前分类下暂无通知记录。</div>
 
@@ -337,6 +444,27 @@
                 </div>
             </div>
         </nav>
+
+        <!-- 时间变更确认弹窗 -->
+        <div v-if="reviewOpen" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl w-full max-w-lg p-5 space-y-3 shadow-xl">
+                <h3 class="font-bold text-slate-800">确认要修改的任务</h3>
+                <p class="text-xs text-slate-500">来源消息：{{ reviewSource && reviewSource.data ? reviewSource.data.title : '' }}</p>
+                <select v-model="reviewTargetId" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+                    <option :value="null">请选择要修改的任务</option>
+                    <option v-for="t in urgentTargets" :key="t.id" :value="t.id">{{ t.data.title }}（{{ t.created_at }}）</option>
+                </select>
+                <textarea v-model="reviewSummary" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                          placeholder="修改后的描述，例如：数据结构作业截止时间改为本周五"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="reviewOpen = false" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900">取消</button>
+                    <button @click="applyReview" :disabled="!reviewTargetId || !reviewSummary.trim()"
+                            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg disabled:opacity-40 transition">
+                        确认修改
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -362,6 +490,66 @@
                 const ruleList = ref([]);
                 const newRule = ref({ app: '', keyword: '', targetCat: '重要/紧急待办' });
 
+                // 重要任务时间变更：待用户确认
+                const reviewOpen = ref(false);
+                const reviewSource = ref(null);
+                const reviewTargetId = ref(null);
+                const reviewSummary = ref('');
+
+                // 拦截类卡片展开状态
+                const expandedBlocked = ref(new Set());
+                const toggleBlocked = (key) => {
+                    const s = expandedBlocked.value;
+                    if (s.has(key)) s.delete(key);
+                    else s.add(key);
+                };
+
+                // 聚合体看板里"标记已读"（= 删除这条通知）
+                const removeNotification = async (id) => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/history/${id}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('标记已读失败：' + e.message);
+                    }
+                };
+
+                // 整卡"全部已读"
+                const markAllRead = async (group) => {
+                    const ids = (group.items || []).map((x) => x.id);
+                    if (!ids.length) return;
+                    try {
+                        await Promise.all(ids.map((id) =>
+                            fetch(`${API_BASE}/api/history/${id}`, { method: 'DELETE' })
+                        ));
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('批量已读失败：' + e.message);
+                    }
+                };
+
+                // 支付单条改向（支出 ↔ 收入），改完重新统计
+                const toggleTxnDirection = async (txn) => {
+                    const next = txn.direction === 'income' ? 'expense' : 'income';
+                    try {
+                        for (const id of txn.ids || []) {
+                            const res = await fetch(`${API_BASE}/api/history/${id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ direction: next }),
+                            });
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        }
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('修改收支方向失败：' + e.message);
+                    }
+                };
+
                 const samples = {
                     1: "【教务处】重要通知：关于本周五下午全校停水检修的紧急通知。",
                     2: "【慕课】单元测验即将截止，注意按时完成。",
@@ -380,9 +568,12 @@
                 // 2) 老数据：没有这两个字段，退回正则兜底
                 const PAY_DEDUPE_MS = 5000;   // 同额同向的合并窗口（时间精确到秒，实际约 5 秒）
 
-                // 通知里的【应用名】本身含「支付宝/银行」，会伪装成支付，先剥掉
-                const stripAppTag = (s) => String(s || '').replace(/【[^】]{0,16}】/g, ' ').replace(/\[[^\]]{0,16}\]/g, ' ');
-                const payText = (item) => `${item.data.title || ''} ${item.data.summary || ''} ${item.original || ''}`;
+                // 通知里的【应用名】本身含「支付宝/银行」，会伪装成支付，先剥掉。
+                // 只剥开头那一个：正文里的【取件码-13-4-1426】不能被误伤。
+                const stripAppTag = (s) => String(s || '').replace(/^\s*[【\[][^】\]]{0,16}[】\]]\s*/, '');
+                const payText = (item) => [item.data.title, item.data.summary, item.original]
+                    .map((x) => stripAppTag(x || ''))
+                    .join(' ');
 
                 const PAY_STRONG = /(支付成功|付款成功|已支付|已付款|支付了|付款了|已扣款|扣款成功|消费成功|交易成功|充值成功|实付|实际支付)/;
                 const PAY_ACT = /(支付|付款|消费|扣款|支出|交易|充值)/;
@@ -460,6 +651,101 @@
                     return null;
                 };
 
+                // ---- 快递事件识别 ----
+                // 到达 / 签收 / 「剩余 n 个」/ 「全部签收」/ 滞留，按时间顺序推演「当前还有几件待取」
+                const EXPRESS_ANY = /(快递|包裹|驿站|菜鸟|取件|派送|代收点|快递柜|物流|签收)/;
+                const EXPRESS_ARRIVE = /(已送达|已到达|送达|到达|待取|取件|驿站|代收点|快递柜)/;
+                const EXPRESS_NOT_ARRIVE = /(派送|运输中|已揽收|已发货|物流状态|物流更新|新站点|在途|已退回|退回)/;
+                const EXPRESS_CLEAR = /(全部签收|全部取走|全部取完|已全部取|暂无包裹|无待取|已取完|没有待取)/;
+                const EXPRESS_REMAIN = /(?:剩余|还有|还剩)\s*(\d+)\s*(?:个|件)/;
+                const EXPRESS_PICKUP = /(签收成功|已签收|签收完成|取件成功|已取件|已领取|取件完成|出库成功|已出库)/;
+                const EXPRESS_STALE = /(滞留|超时未取|超过\s*\d+\s*小时)/;
+
+                // 取件码：5-2-3008 / 13-4-1426 / 取件码：12-3-456
+                const pickPickupCode = (s) => {
+                    const m = s.match(/取件码[\s:：\-–—]*([0-9]{1,3}(?:[-–—][0-9]{1,5}){1,2})/);
+                    return m ? m[1].replace(/[–—]/g, '-') : '';
+                };
+
+                // 返回 { type, count?, code? } 或 null
+                // 优先级：全部签收 > 剩余 n（最权威）> 滞留 > 签收 > 到达
+                const detectExpress = (item) => {
+                    const body = stripAppTag(payText(item));
+                    if (!EXPRESS_ANY.test(body)) return null;
+
+                    if (EXPRESS_CLEAR.test(body)) return { type: 'clear' };
+                    const rm = body.match(EXPRESS_REMAIN);
+                    if (rm) return { type: 'remain', count: parseInt(rm[1], 10) };
+                    if (EXPRESS_STALE.test(body)) {
+                        const m = body.match(/有\s*(\d+)\s*个/) || body.match(/(\d+)\s*个[^，。]{0,12}(滞留|超时)/);
+                        return { type: 'stale', count: m ? parseInt(m[1], 10) : 0 };
+                    }
+                    if (EXPRESS_PICKUP.test(body)) return { type: 'pickup' };
+                    if (!EXPRESS_ARRIVE.test(body)) return null;
+                    if (EXPRESS_NOT_ARRIVE.test(body)) return null;
+                    return { type: 'arrive', code: pickPickupCode(body) };
+                };
+
+                // 待确认的时间变更：只以提示卡出现，不在列表里重复占一条
+                const pendingChanges = ref([]);
+                // 可被修改的目标任务（重要待办里不是"变更消息"的那些）
+                const urgentTargets = computed(() =>
+                    historyList.value.filter((i) => i.data && i.data.category === '重要/紧急待办' && !i.data.is_time_change)
+                );
+
+                const openChangeReview = (src, suggest) => {
+                    reviewSource.value = src;
+                    const task = src.data && src.data.related_task;
+                    reviewSummary.value = task
+                        ? `「${task}」时间变更：${src.data.summary || src.data.title}`
+                        : (src.data.summary || src.data.title || '');
+                    reviewTargetId.value = null;
+                    if (suggest && task) {
+                        const hit = urgentTargets.value.find(
+                            (t) => (t.data.title || '').includes(task) || (t.data.event_key || '').includes(task)
+                        );
+                        if (hit) reviewTargetId.value = hit.id;
+                    }
+                    reviewOpen.value = true;
+                };
+
+                const applyReview = async () => {
+                    if (!reviewTargetId.value || !reviewSummary.value.trim()) return;
+                    try {
+                        const r1 = await fetch(`${API_BASE}/api/history/${reviewTargetId.value}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ summary: reviewSummary.value.trim() }),
+                        });
+                        if (!r1.ok) throw new Error(`目标更新失败 HTTP ${r1.status}`);
+                        const r2 = await fetch(`${API_BASE}/api/history/${reviewSource.value.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ change_review: 'applied', change_target_id: reviewTargetId.value }),
+                        });
+                        if (!r2.ok) throw new Error(`状态更新失败 HTTP ${r2.status}`);
+                        reviewOpen.value = false;
+                        await fetchHistory();
+                        await fetchStats();
+                    } catch (e) {
+                        alert('修改失败：' + e.message);
+                    }
+                };
+
+                const ignoreChange = async (src) => {
+                    try {
+                        const r = await fetch(`${API_BASE}/api/history/${src.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ change_review: 'ignored' }),
+                        });
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        await fetchHistory();
+                    } catch (e) {
+                        alert('操作失败：' + e.message);
+                    }
+                };
+
                 const dynamicAggregations = computed(() => {
                     const groups = {};
                     
@@ -469,40 +755,49 @@
                         
                         let key = isBlocked ? '已拦截的消息' : (item.data.event_key || item.data.title || '通用通知');
                         
-                        const textToCheck = (item.data.title + item.data.summary + item.original).toLowerCase();
-                        
                         // 收支判定：优先用模型给的 amount / direction，老数据走正则兜底
                         const pay = isBlocked ? null : detectPayment(item);
                         const isFinancialPayment = !!pay;
-                        
-                        const isExpressDelivery = !isFinancialPayment && cat === '其他类' && (
-                            textToCheck.includes('快递') || 
-                            textToCheck.includes('包裹') || 
-                            textToCheck.includes('菜鸟') || 
-                            textToCheck.includes('驿站') || 
-                            textToCheck.includes('取件') ||
-                            textToCheck.includes('派送')
-                        );
+
+                        // 快递到达判定：非到达节点（派送中/运输中/物流更新…）直接排除
+                        const express = isFinancialPayment || isBlocked ? null : detectExpress(item);
+                        const isExpressDelivery = !!express;
+
+                        // 重要待办：一条消息一个事件，在聚合体里统一收进一张卡
+                        const isUrgentTask = !isBlocked && !isFinancialPayment && !isExpressDelivery
+                            && cat === '重要/紧急待办';
+                        // 自定义规则改判到「其他类」的消息：不参与聚合，单条展示
+                        const isCustomOther = !isBlocked && !isFinancialPayment && !isExpressDelivery
+                            && !isUrgentTask && !!item.data.custom_rule;
                         
                         if (isFinancialPayment) {
                             key = '今日消费与支付账单';
                         } else if (isExpressDelivery) {
                             key = '待取快递与物流动态';
+                        } else if (isUrgentTask) {
+                            key = '重要待办事件';
+                        } else if (isCustomOther) {
+                            key = `自定义 · ${item.data.title || item.id}`;
                         }
                         
                         if (!groups[key]) {
                             groups[key] = { 
                                 key: key, 
-                                kind: isBlocked ? 'blocked' : (isFinancialPayment ? 'payment' : (isExpressDelivery ? 'express' : 'normal')),
+                                kind: isBlocked ? 'blocked'
+                                    : (isFinancialPayment ? 'payment'
+                                    : (isExpressDelivery ? 'express'
+                                    : (isUrgentTask ? 'urgent' : 'normal'))),
                                 count: 0, 
                                 businessCount: 0, 
                                 totalAmount: 0, 
                                 incomeTotal: 0,
+                                items: [],
                                 txns: [],
+                                parcels: [],
+                                events: [],
+                                stationCount: 0,
                                 mergedCount: 0,
                                 lastTs: 0,
-                                seenAmounts: new Set(), 
-                                expressSet: new Set(), 
                                 lastSummary: item.data.summary, 
                                 lastTime: item.created_at 
                             };
@@ -525,6 +820,7 @@
                                 direction: pay.direction,
                                 ts: toTs(item.created_at),
                                 time: toHHMM(item.created_at),
+                                ids: [item.id],
                                 apps: [item.data.app_name || '未知来源'],
                             };
                             // 同一笔的唯一判据：同向 + 同额 + 5 秒内 + 来源不同。
@@ -538,6 +834,7 @@
                             );
                             if (dup) {
                                 if (!dup.apps.includes(txn.apps[0])) dup.apps.push(txn.apps[0]);
+                                dup.ids.push(item.id);
                                 groups[key].mergedCount += 1;
                             } else {
                                 groups[key].txns.push(txn);
@@ -557,18 +854,54 @@
                                 groups[key].lastTime = item.created_at;
                             }
                         }
-                        // 2. 快递类处理
+                        // 2. 快递：先收集事件，循环结束后按时间推演待取件数
                         else if (isExpressDelivery) {
-                            const batchId = item.created_at ? item.created_at.substring(0, 16) : 'express_batch';
-                            groups[key].expressSet.add(batchId);
-                            groups[key].businessCount = groups[key].expressSet.size;
-                            // 确保此处使用的是正确的 businessCount 变量，杜绝 undefined
-                            groups[key].lastSummary = `【待取包裹：共 ${groups[key].businessCount} 件】 已自动聚合多源物流通知。`;
-                            groups[key].lastTime = item.created_at;
+                            const ts = toTs(item.created_at);
+                            groups[key].events.push({
+                                ...express,
+                                ts,
+                                time: toHHMM(item.created_at),
+                                app: item.data.app_name || '未知来源',
+                            });
+                            if (!groups[key].lastTs || ts >= groups[key].lastTs) {
+                                groups[key].lastTs = ts;
+                                groups[key].lastTime = item.created_at;
+                            }
                         }
-                        // 3. 拦截类处理（动态读取被拦截消息的内容，拒绝死板！）
+                        // 3. 重要待办：一条消息一个事件，统一收进「重要待办事件」这张卡
+                        else if (isUrgentTask) {
+                            const ts = toTs(item.created_at);
+                            if (!groups[key].items.some((x) => x.id === item.id)) {
+                                groups[key].items.push({
+                                    id: item.id,
+                                    title: item.data.title || '',
+                                    summary: item.data.summary || '',
+                                    ts,
+                                    time: toHHMM(item.created_at),
+                                    changed: !!item.data.is_time_change,
+                                });
+                            }
+                            groups[key].businessCount = groups[key].items.length;
+                            groups[key].lastSummary = `共 ${groups[key].businessCount} 条重要待办`;
+                            if (!groups[key].lastTs || ts >= groups[key].lastTs) {
+                                groups[key].lastTs = ts;
+                                groups[key].lastTime = item.created_at;
+                            }
+                        }
+                        // 4. 拦截类处理（动态读取被拦截消息的内容，拒绝死板！）
                         else if (isBlocked) {
-                            groups[key].businessCount = groups[key].count;
+                            const ts = toTs(item.created_at);
+                            if (!groups[key].items.some((x) => x.id === item.id)) {
+                                groups[key].items.push({
+                                    id: item.id,
+                                    title: item.data.title || '',
+                                    app: item.data.app_name || '',
+                                    summary: item.data.summary || '',
+                                    ts,
+                                    time: toHHMM(item.created_at),
+                                });
+                            }
+                            groups[key].businessCount = groups[key].items.length;
                             // 如果是淘宝京东等营销，显示营销折叠；如果是其他自定义拦截，动态展示其摘要
                             const rawSummary = item.data.summary || '';
                             if (rawSummary.includes('营销') || rawSummary.includes('促销') || rawSummary.includes('优惠') || rawSummary.includes('京东') || rawSummary.includes('淘宝')) {
@@ -592,6 +925,59 @@
                     const list = Object.values(groups);
                     list.forEach(g => {
                         if (g.kind === 'payment') g.txns.sort((a, b) => b.ts - a.ts);
+                        if (g.kind === 'urgent' || g.kind === 'blocked') g.items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                    });
+
+                    // 快递：按时间顺序推演「当前待取件数」
+                    // 到达 +1；签收 −1；「剩余 n 个」直接覆盖；「全部签收」清零；滞留做校正
+                    list.forEach(g => {
+                        if (g.kind !== 'express') return;
+                        const evts = [...g.events].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+                        let parcels = [];
+                        let merged = 0;
+                        let pending = 0;
+                        let station = 0;
+                        for (const e of evts) {
+                            if (e.type === 'arrive') {
+                                const dup = parcels.find(
+                                    (p) => ((Math.abs(p.ts - e.ts) < 5000 && !p.apps.includes(e.app))
+                                            || (e.code && p.code === e.code))
+                                        // 取件码不同 = 两个包裹，时间再近也不能并
+                                        && (!e.code || !p.code || e.code === p.code)
+                                );
+                                if (dup) {
+                                    if (!dup.apps.includes(e.app)) dup.apps.push(e.app);
+                                    if (!dup.code && e.code) dup.code = e.code;
+                                    merged += 1;
+                                } else {
+                                    parcels.push({ code: e.code, ts: e.ts, time: e.time, apps: [e.app] });
+                                }
+                                pending = parcels.length;
+                            } else if (e.type === 'pickup') {
+                                pending = Math.max(0, pending - 1);
+                                parcels = parcels.slice(0, pending);
+                            } else if (e.type === 'remain') {
+                                pending = Math.max(0, e.count);
+                                if (parcels.length > pending) parcels = parcels.slice(0, pending);
+                            } else if (e.type === 'clear') {
+                                pending = 0;
+                                parcels = [];
+                            } else if (e.type === 'stale') {
+                                station = e.count;
+                                if (e.count > 0) {
+                                    pending = e.count;
+                                    if (parcels.length > pending) parcels = parcels.slice(0, pending);
+                                }
+                            }
+                        }
+                        g.parcels = parcels;
+                        g.businessCount = pending;
+                        g.mergedCount = merged;
+                        g.stationCount = station;
+                        const codes = parcels.map((p) => p.code).filter(Boolean);
+                        g.lastSummary = `【待取包裹：共 ${pending} 件】`
+                            + (codes.length ? ` 取件码 ${codes.join('、')}。` : ' 已自动聚合多源物流通知。')
+                            + (station ? ` 驿站提示当前滞留 ${station} 件。` : '');
                     });
                     return list;
                 });
@@ -620,18 +1006,24 @@
                                 return item;
                             });
 
+                            // 变更类消息不进列表，只在顶部提示卡里出现
+                            pendingChanges.value = allItems.filter(
+                                (i) => i.data && i.data.is_time_change && !i.data.change_review
+                            );
+                            const visible = allItems.filter((i) => !(i.data && i.data.is_time_change));
+
                             // 按当前 Tab 本地渲染过滤
                             const tab = currentTab.value;
                             if (tab === 'overview' || tab === 'express') {
-                                historyList.value = allItems;
+                                historyList.value = visible;
                             } else if (tab === 'urgent') {
-                                historyList.value = allItems.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
+                                historyList.value = visible.filter(i => i.data.is_urgent || i.data.category === '重要/紧急待办');
                             } else if (tab === 'other') {
-                                historyList.value = allItems.filter(i => i.data.category === '其他类');
+                                historyList.value = visible.filter(i => i.data.category === '其他类');
                             } else if (tab === 'blocked') {
-                                historyList.value = allItems.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
+                                historyList.value = visible.filter(i => i.data.category === '无效广告/促销' || i.data.category === '拦截类消息');
                             } else {
-                                historyList.value = allItems;
+                                historyList.value = visible;
                             }
                         }
                     } catch (e) { 
@@ -930,7 +1322,11 @@
                 return {
                     currentTab, inputText, loading, fetchingHistory, historyList, stats, aggResult, readTabs, dynamicAggregations,
                     ruleList, newRule, addRule, deleteRule, resetRules, refreshSeedData, deleteNotification, // <--- 加上这一项
-                    loadSample, getTabTitle, submitNotification, clearHistory, runGlobalAggregation, aggLoading
+                    loadSample, getTabTitle, submitNotification, clearHistory, runGlobalAggregation, aggLoading,
+                    pendingChanges, urgentTargets, reviewOpen, reviewSource, reviewTargetId, reviewSummary,
+                    openChangeReview, applyReview, ignoreChange,
+                    expandedBlocked, toggleBlocked, removeNotification,
+                    markAllRead, toggleTxnDirection
                 };
             }
         }).mount('#app');

@@ -29,6 +29,20 @@ def clean_notification_text(raw_notification: str) -> dict:
     「【微信支付】退款68.00元已到账」 -> amount=68, direction="income"
     「【招商银行】您尾号1234的卡消费100元，当前余额900元」 -> amount=100, direction="expense"
 
+    还要判断这条消息是不是「对某个已有任务的时间/地点修改」，输出 is_time_change 和 related_task：
+    - is_time_change：含「改到 / 改成 / 变成 / 延期 / 提前 / 推迟 / 取消 / 调到 / 换到」等，且描述的是
+      截止时间、上课时间、地点、考试的变动时填 true；其它情况填 false。
+    - related_task：被修改的任务名称（如「数据结构作业」「物理实验」）。看不出改的是哪个就填 null。
+    - 【重要】这类短句（例如「变成周五之前」「改到30号」「记错了」）脱离了聊天记录本身没有意义，
+      但绝不能被判成广告——只要看起来像在改时间/改地点，category 必须是「重要/紧急待办」。
+    - 注意：「明天只用交线代作业」是布置任务，不是修改，is_time_change=false。
+
+    判断示例：
+    「26号之前交数据结构4、5章作业」 -> is_time_change=false, related_task=null
+    「变成周五之前」 -> is_time_change=true, related_task=null（看不出改的是哪个）
+    「数据结构作业改到周五前提交」 -> is_time_change=true, related_task="数据结构作业"
+    「记错了30号」 -> is_time_change=true, related_task=null
+
     必须严格输出以下标准的 JSON 格式：
     {
       "app_name": "应用名称",
@@ -38,7 +52,9 @@ def clean_notification_text(raw_notification: str) -> dict:
       "is_urgent": false,
       "event_key": "事件特征短标签（如：晨跑刷脸、数据结构作业、美团外卖）",
       "amount": null,
-      "direction": "none"
+      "direction": "none",
+      "is_time_change": false,
+      "related_task": null
     }
     """
 
