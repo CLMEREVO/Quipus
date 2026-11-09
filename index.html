@@ -1669,113 +1669,46 @@
                     }
                 };
 
-                const runGlobalAggregation = async () => {
+                // 一键汇总：直接读聚合体那份数据，保证和卡片上的数字完全一致（不再走模型）
+                const runGlobalAggregation = () => {
                     aggLoading.value = true;
                     aggResult.value = null;
                     try {
-                        const resAll = await fetch(`${API_BASE}/api/history?tab=overview&limit=1000`);
-                        const jsonAll = await resAll.json();
-                        const allItems = jsonAll.status === 'success' ? jsonAll.items : [];
-
-                        if (allItems.length === 0) {
+                        if (!fullList.value.length) {
                             alert('当前暂无通知可聚合，请先提交通知或一键恢复测试示例！');
-                            aggLoading.value = false;
                             return;
                         }
+                        const groups = dynamicAggregations.value;
+                        const pay = groups.find((g) => g.kind === 'payment');
+                        const other = groups.find((g) => g.kind === 'other');
+                        const urgent = groups.find((g) => g.kind === 'urgent');
+                        const blocked = groups.find((g) => g.kind === 'blocked');
 
-                        // 前端本地对真实消费金额做统计算法（引入消费签名去重机制，杜绝重复累加！）
-                        let totalSum = 0;
-                        const seenTxns = new Set();
-                        
-                        allItems.forEach(item => {
-                            const cat = item.data.category;
-                            const isBlocked = cat === '无效广告/促销' || cat === '拦截类消息';
-                            const fullText = (item.data.title || '') + " " + (item.data.summary || '') + " " + (item.original || '');
-                            const lowerText = fullText.toLowerCase();
-
-                            // 排除拦截类、营销券、卡号尾号
-                            if (isBlocked || lowerText.includes('优惠券') || lowerText.includes('消费券') || lowerText.includes('满减') || lowerText.includes('领取') || lowerText.includes('白条额度') || lowerText.includes('降价')) {
-                                return;
-                            }
-
-                            let cleanText = fullText.replace(/尾号\d{4}/g, '').replace(/卡号\d{4}/g, '');
-
-                            // 匹配有效金额
-                            const moneyRegex = /(?:[¥$￥]|RMB)?\s*(\d+(?:\.\d+)?)\s*(?:元|RMB|￥)/g;
-                            let match;
-                            while ((match = moneyRegex.exec(cleanText)) !== null) {
-                                const v = parseFloat(match[1]);
-                                if (!isNaN(v) && v > 0 && v < 100000) {
-                                    // 核心去重：通过“金额 + 模糊时间（精确到分钟）”生成唯一签名，防止默认示例中多源或重复数据被加两次
-                                    const timeMinute = item.created_at ? item.created_at.substring(0, 16) : 'time';
-                                    const txnSig = `${timeMinute}_${v}`;
-                                    
-                                    if (!seenTxns.has(txnSig)) {
-                                        seenTxns.add(txnSig);
-                                        totalSum += v;
-                                    }
-                                    break; 
-                                }
-                            }
-                        });
-
-                        const realTexts = allItems.map(item => item.original);
-                        
-                        // 2. 尝试调用后端聚合接口
-                        let apiSummary = "";
-                        let apiTitle = "多源通知智能聚合";
-                        try {
-                            const res = await fetch(`${API_BASE}/api/aggregate`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ notifications: realTexts })
-                            });
-                            const json = await res.json();
-                            console.log("后端聚合接口返回原始数据：", json); // F12 控制台可查
-                            
-                            if (json.status === "success") {
-                                const resData = json.aggregated_result || json.data || json;
-                                apiSummary = resData.merged_summary || resData.summary || resData.text || "";
-                                apiTitle = resData.event_title || resData.title || apiTitle;
-                            }
-                        } catch (err) {
-                            console.warn("后端接口调用异常，已启用前端本地智能聚合兜底：", err);
+                        const parts = [];
+                        if (other && other.express && other.express.count > 0) {
+                            const codes = (other.express.codes || []).slice(0, 3).join('、');
+                            parts.push(`您有 ${other.express.count} 件待取快递${codes ? `（取件码 ${codes}）` : ''}`);
                         }
-
-                        // 3. 终极兜底：如果后端未返回有效摘要，前端根据当前内容自主生成高质量摘要，确保比赛演示万无一失！
-                        if (!apiSummary) {
-                            if (totalSum > 0) {
-                                apiSummary = `已成功聚合多源消费通知，实现全渠道流水汇总。`;
-                                apiTitle = "今日消费与支付账单";
-                            } else if (allItems.some(i => i.original.includes('快递') || i.original.includes('包裹'))) {
-                                apiSummary = `已自动聚合多源物流通知，消除冗余打扰。`;
-                                apiTitle = "待取快递与物流动态";
-                            } else {
-                                apiSummary = `已成功为您处理并融合相关 ${allItems.length} 条碎片通知。`;
-                            }
+                        const extraRows = other ? other.rows.filter((r) => r.id) : [];
+                        if (extraRows.length) parts.push(`另有 ${extraRows.length} 条其他类消息`);
+                        if (urgent && urgent.items.length) {
+                            const latest = [...urgent.items].sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+                            parts.push(`${urgent.items.length} 条重要待办（最近：${latest.title}）`);
                         }
+                        if (blocked && blocked.businessCount) parts.push(`已拦截 ${blocked.businessCount} 条营销推送`);
 
-                        // 4. 文案精修与金额拼接
-                        if (apiSummary.includes('26号') && (apiSummary.includes('周五') || apiSummary.includes('星期五'))) {
-                            apiSummary = "数据结构作业提交截止时间已更新为本周五之前。";
+                        let summary = parts.length ? parts.join('；') + '。' : '';
+                        if (pay) {
+                            summary += `今日支出 ¥${pay.totalAmount.toFixed(2)}`;
+                            if (pay.incomeTotal > 0) summary += `，收入 ¥${pay.incomeTotal.toFixed(2)}`;
+                            summary += '。';
                         }
-                        apiSummary = apiSummary.replace(/同时/g, '先后');
-                        apiSummary = apiSummary.replace(/共?[\d\.]+元/g, '').replace(/合计[\d\.]+元/g, '');
+                        if (!summary) summary = `已为您整理 ${fullList.value.length} 条通知。`;
 
-                        if (totalSum > 0) {
-                            apiSummary += ` 【今日累计支出：¥${totalSum.toFixed(2)}】`;
-                        }
-
-                        aggResult.value = { 
-                            title: apiTitle, 
-                            summary: apiSummary 
-                        };
-
-                    } catch (e) { 
-                        alert('聚合处理异常: ' + e.message); 
-                    } finally { 
-                        aggLoading.value = false; 
-                        setTimeout(() => lucide.createIcons(), 100); 
+                        aggResult.value = { title: '近期通知汇总', summary };
+                    } finally {
+                        aggLoading.value = false;
+                        setTimeout(() => lucide.createIcons(), 60);
                     }
                 };
 
