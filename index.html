@@ -1596,13 +1596,17 @@
 
                 const clearHistory = async () => {
                     if (!confirm('确定清空所有历史通知吗？')) return;
-                    
+
                     try {
                         await fetch(`${API_BASE}/api/history`, { method: 'DELETE' });
                     } catch (e) {}
 
+                    // 清空后必须重拉一次：聚合体、待确认计数、各分类列表都从同一份数据派生
+                    readTabs.value.clear();
                     historyList.value = [];
-                        readTabs.value.clear();
+                    fullList.value = [];
+                    pendingChanges.value = [];
+                    await fetchHistory();
                     await fetchStats();
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
