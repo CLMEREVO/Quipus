@@ -125,20 +125,6 @@
                         </button>
                     </div>
 
-                    <!-- 全局聚合 Demo 按钮区 -->
-                    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div class="text-xs text-slate-500">多源碎片通知一键聚合演示 (Demo)：根据当前提交的所有通知动态生成摘要</div>
-                        <button @click="runGlobalAggregation" :disabled="aggLoading" class="w-full md:w-auto justify-center px-4 py-2 bg-[#221D16] hover:bg-[#3A2E22] text-white text-xs font-medium rounded-lg transition flex items-center space-x-2">
-                            <span v-if="aggLoading" class="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
-                            <span>{{ aggLoading ? "AI 聚合中..." : "一键生成全局聚合摘要" }}</span>
-                        </button>
-                    </div>
-
-                    <!-- 演示聚合小卡片：稳定展示 -->
-                    <div v-if="aggResult" class="p-4 bg-gradient-to-br from-[#FBF3DF] to-[#FAF7F1] rounded-lg border border-[#E8D9B5]">
-                        <h4 class="font-bold text-sm text-[#221D16] mb-1">📦 {{ aggResult.title }}</h4>
-                        <p class="text-xs text-slate-700">{{ aggResult.summary }}</p>
-                    </div>
 
                     <!-- 移动端：演示控制按钮（桌面端在左侧边栏） -->
                     <div class="md:hidden flex gap-2 pt-3 border-t border-slate-100">
@@ -608,9 +594,7 @@
                 const historyList = ref([]);
                 // 全量消息（与 tab 无关），聚合体与待确认计数都基于它，避免切换分类时数字跳动
                 const fullList = ref([]);
-                const aggLoading = ref(false);
-                const aggResult = ref(null);
-                const readTabs = ref(new Set());
+                                                const readTabs = ref(new Set());
                 const stats = ref({ total: 0, urgent: 0, other: 0, blocked: 0 });
 
                 const ruleList = ref([]);
@@ -1618,8 +1602,7 @@
                     } catch (e) {}
 
                     historyList.value = [];
-                    aggResult.value = null;
-                    readTabs.value.clear();
+                        readTabs.value.clear();
                     await fetchStats();
                     alert('已彻底清空所有通知与聚合卡片！');
                 };
@@ -1632,8 +1615,7 @@
                     historyList.value = historyList.value.filter(
                         i => (i._id ?? i.id ?? i.notification_id) !== realId
                     );
-                    aggResult.value = null;
-
+    
                     // 2. 真删：调后端 DELETE /api/history/{id}，把数据库里那条记录删掉
                     try {
                         const res = await fetch(`${API_BASE}/api/history/${realId}`, { method: 'DELETE' });
@@ -1670,47 +1652,6 @@
                 };
 
                 // 一键汇总：直接读聚合体那份数据，保证和卡片上的数字完全一致（不再走模型）
-                const runGlobalAggregation = () => {
-                    aggLoading.value = true;
-                    aggResult.value = null;
-                    try {
-                        if (!fullList.value.length) {
-                            alert('当前暂无通知可聚合，请先提交通知或一键恢复测试示例！');
-                            return;
-                        }
-                        const groups = dynamicAggregations.value;
-                        const pay = groups.find((g) => g.kind === 'payment');
-                        const other = groups.find((g) => g.kind === 'other');
-                        const urgent = groups.find((g) => g.kind === 'urgent');
-                        const blocked = groups.find((g) => g.kind === 'blocked');
-
-                        const parts = [];
-                        if (other && other.express && other.express.count > 0) {
-                            const codes = (other.express.codes || []).slice(0, 3).join('、');
-                            parts.push(`您有 ${other.express.count} 件待取快递${codes ? `（取件码 ${codes}）` : ''}`);
-                        }
-                        const extraRows = other ? other.rows.filter((r) => r.id) : [];
-                        if (extraRows.length) parts.push(`另有 ${extraRows.length} 条其他类消息`);
-                        if (urgent && urgent.items.length) {
-                            const latest = [...urgent.items].sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
-                            parts.push(`${urgent.items.length} 条重要待办（最近：${latest.title}）`);
-                        }
-                        if (blocked && blocked.businessCount) parts.push(`已拦截 ${blocked.businessCount} 条营销推送`);
-
-                        let summary = parts.length ? parts.join('；') + '。' : '';
-                        if (pay) {
-                            summary += `今日支出 ¥${pay.totalAmount.toFixed(2)}`;
-                            if (pay.incomeTotal > 0) summary += `，收入 ¥${pay.incomeTotal.toFixed(2)}`;
-                            summary += '。';
-                        }
-                        if (!summary) summary = `已为您整理 ${fullList.value.length} 条通知。`;
-
-                        aggResult.value = { title: '近期通知汇总', summary };
-                    } finally {
-                        aggLoading.value = false;
-                        setTimeout(() => lucide.createIcons(), 60);
-                    }
-                };
 
                 onMounted(() => {
                     lucide.createIcons();
@@ -1720,9 +1661,9 @@
                 });
 
                 return {
-                    currentTab, inputText, loading, fetchingHistory, historyList, stats, aggResult, readTabs, dynamicAggregations,
+                    currentTab, inputText, loading, fetchingHistory, historyList, stats, readTabs, dynamicAggregations,
                     ruleList, newRule, addRule, deleteRule, resetRules, refreshSeedData, deleteNotification, // <--- 加上这一项
-                    loadSample, getTabTitle, submitNotification, clearHistory, runGlobalAggregation, aggLoading,
+                    loadSample, getTabTitle, submitNotification, clearHistory,
                     pendingChanges, urgentTargets, reviewOpen, reviewSource, reviewTargetId, reviewSummary,
                     openChangeReview, applyReview, ignoreChange,
                     expandedBlocked, toggleBlocked, removeNotification,
